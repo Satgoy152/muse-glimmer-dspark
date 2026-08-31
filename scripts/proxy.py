@@ -34,6 +34,8 @@ class Handler(BaseHTTPRequestHandler):
         except urllib.error.HTTPError as e:
             resp, code = {"error": e.read().decode()[:2000]}, e.code
 
+        # capture: the exact body we sent (messages + tools + sampling params) and the exact
+        # body we got back (content, reasoning, tool_calls, usage), appended as one JSONL line
         with lock, open(LOG, "a") as f:
             f.write(json.dumps({
                 "traj": traj_id(body["messages"]),
