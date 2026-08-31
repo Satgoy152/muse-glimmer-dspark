@@ -11,8 +11,8 @@ lock = threading.Lock()
 
 
 def traj_id(messages):
-    head = json.dumps(messages[:1], sort_keys=True)
-    return hashlib.sha1(head.encode()).hexdigest()[:16]
+    first_user = next((m for m in messages if m.get("role") == "user"), messages[0])
+    return hashlib.sha1(json.dumps(first_user, sort_keys=True).encode()).hexdigest()[:16]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -34,8 +34,8 @@ class Handler(BaseHTTPRequestHandler):
         except urllib.error.HTTPError as e:
             resp, code = {"error": e.read().decode()[:2000]}, e.code
 
-        # capture: the exact body we sent (messages + tools + sampling params) and the exact
-        # body we got back (content, reasoning, tool_calls, usage), appended as one JSONL line
+        # capture: body we sent (messages + tools + sampling params) and 
+        # body we get back (content, reasoning, tool_calls, usage)
         with lock, open(LOG, "a") as f:
             f.write(json.dumps({
                 "traj": traj_id(body["messages"]),
