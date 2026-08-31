@@ -1,0 +1,67 @@
+{
+ "name": "swe-traces-train-2k",
+ "seed": 20260830,
+ "n": 2000,
+ "pool_size": 8703,
+ "total_instances": 8814,
+ "dropped_repo_leakage": 0,
+ "dropped_duplicate_id": 111,
+ "excluded_repos": [
+  "amazon-science/esci-data",
+  "anurag461/lm-evaluation-harness",
+  "chaoningzhang/mobilesam",
+  "danini/magsac",
+  "facebookresearch/moco",
+  "georgkrause/langcodes",
+  "openai/spinningup",
+  "opencv/opencv",
+  "spocknots/pyknotid"
+ ],
+ "n_repos": 1106,
+ "by_source": {
+  "nebius/SWE-bench-extra": 1113,
+  "SWE-Gym/SWE-Gym": 887
+ },
+ "top_repos": [
+  [
+   "dask/dask",
+   91
+  ],
+  [
+   "python/mypy",
+   91
+  ],
+  [
+   "getmoto/moto",
+   91
+  ],
+  [
+   "iterative/dvc",
+   91
+  ],
+  [
+   "modin-project/modin",
+   91
+  ],
+  [
+   "pandas-dev/pandas",
+   91
+  ],
+  [
+   "Project-MONAI/MONAI",
+   91
+  ],
+  [
+   "pydantic/pydantic",
+   83
+  ],
+  [
+   "conan-io/conan",
+   75
+  ],
+  [
+   "facebookresearch/hydra",
+   66
+  ]
+ ]
+}

@@ -1,0 +1,11 @@
+[project]
+name = "muse-glimmer-dspark"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.32",
+    "pyarrow>=17",
+    "pandas>=2.2",
+    "huggingface-hub>=0.34",
+    "pyyaml>=6",
+]

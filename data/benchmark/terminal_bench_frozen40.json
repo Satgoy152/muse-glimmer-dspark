@@ -1,0 +1,278 @@
+{
+ "name": "terminal-bench-frozen-40",
+ "seed": 20260830,
+ "source_repo": "harbor-framework/terminal-bench-1",
+ "source_tree_sha": "d28711d0da2675d0bb1d56de45ae5df6082438a3",
+ "n": 40,
+ "difficulty": {
+  "easy": 11,
+  "medium": 20,
+  "hard": 9
+ },
+ "category": {
+  "software-engineering": 2,
+  "system-administration": 3,
+  "scientific-computing": 2,
+  "algorithms": 2,
+  "machine-learning": 3,
+  "personal-assistant": 1,
+  "model-training": 3,
+  "reproducible-builds": 1,
+  "file-operations": 2,
+  "security": 2,
+  "games": 3,
+  "mathematics": 3,
+  "data-processing": 2,
+  "debugging": 3,
+  "optimization": 1,
+  "data-science": 1,
+  "protocol-analysis": 1,
+  "data-querying": 2,
+  "audio-processing": 1,
+  "file-system": 1,
+  "video-processing": 1
+ },
+ "excluded_repos": [],
+ "tasks": [
+  {
+   "task_id": "accelerate-maximal-square",
+   "difficulty": "easy",
+   "category": "software-engineering",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "acl-permissions-inheritance",
+   "difficulty": "medium",
+   "category": "system-administration",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "amuse-install",
+   "difficulty": "easy",
+   "category": "scientific-computing",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "assign-seats",
+   "difficulty": "easy",
+   "category": "algorithms",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "caffe-cifar-10",
+   "difficulty": "medium",
+   "category": "machine-learning",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "constraints-scheduling",
+   "difficulty": "medium",
+   "category": "personal-assistant",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "count-dataset-tokens",
+   "difficulty": "medium",
+   "category": "model-training",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "deterministic-tarball",
+   "difficulty": "medium",
+   "category": "reproducible-builds",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "download-youtube",
+   "difficulty": "medium",
+   "category": "file-operations",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "extract-moves-from-video",
+   "difficulty": "hard",
+   "category": "file-operations",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "extract-safely",
+   "difficulty": "easy",
+   "category": "security",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "gomoku-planner",
+   "difficulty": "easy",
+   "category": "games",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "implement-eigenvectors-from-eigenvalues-research-paper",
+   "difficulty": "medium",
+   "category": "mathematics",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "install-windows-xp",
+   "difficulty": "hard",
+   "category": "system-administration",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "interactive-maze-game",
+   "difficulty": "medium",
+   "category": "games",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "jq-data-processing",
+   "difficulty": "easy",
+   "category": "data-processing",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "llm-inference-batching-scheduler",
+   "difficulty": "hard",
+   "category": "machine-learning",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "log-summary",
+   "difficulty": "easy",
+   "category": "system-administration",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "mnist-learning-fix",
+   "difficulty": "easy",
+   "category": "machine-learning",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "model-extraction-relu-logits",
+   "difficulty": "hard",
+   "category": "mathematics",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "multi-source-data-merger",
+   "difficulty": "medium",
+   "category": "data-processing",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "multistep-definite-integral",
+   "difficulty": "easy",
+   "category": "mathematics",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "ode-solver-rk4",
+   "difficulty": "medium",
+   "category": "algorithms",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "overfull-hbox",
+   "difficulty": "easy",
+   "category": "debugging",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "play-zork-easy",
+   "difficulty": "hard",
+   "category": "games",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "polyglot-c-py",
+   "difficulty": "medium",
+   "category": "software-engineering",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "portfolio-optimization",
+   "difficulty": "medium",
+   "category": "optimization",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "predicate-pushdown-bench",
+   "difficulty": "medium",
+   "category": "data-science",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "predict-customer-churn",
+   "difficulty": "easy",
+   "category": "model-training",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "protocol-analysis-rs",
+   "difficulty": "medium",
+   "category": "protocol-analysis",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "raman-fitting",
+   "difficulty": "medium",
+   "category": "scientific-computing",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "sparql-professors-universities",
+   "difficulty": "medium",
+   "category": "data-querying",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "sparql-university",
+   "difficulty": "hard",
+   "category": "data-querying",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "speech-to-text",
+   "difficulty": "medium",
+   "category": "audio-processing",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "swe-bench-astropy-2",
+   "difficulty": "hard",
+   "category": "debugging",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "swe-bench-fsspec",
+   "difficulty": "medium",
+   "category": "debugging",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "tree-directory-parser",
+   "difficulty": "medium",
+   "category": "file-system",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "video-processing",
+   "difficulty": "hard",
+   "category": "video-processing",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "vul-flask",
+   "difficulty": "medium",
+   "category": "security",
+   "repos_mentioned": []
+  },
+  {
+   "task_id": "word2vec-from-scratch",
+   "difficulty": "hard",
+   "category": "model-training",
+   "repos_mentioned": []
+  }
+ ]
+}
