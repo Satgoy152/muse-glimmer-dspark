@@ -50,6 +50,7 @@ class Env:
         self.dir = RUN / "work" / self.name
         self.root = "/repo"
         url = f"https://github.com/{repo}"
+      # get the commit foor the actual task
         if DOCKER:
             subprocess.run(["docker", "run", "-d", "--rm", "--name", self.name,
                             "--network", "bridge", "--memory", "4g", "--cpus", "2",

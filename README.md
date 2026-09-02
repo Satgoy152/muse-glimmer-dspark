@@ -16,9 +16,12 @@ This project fine-tunes a speculator on curated on-policy coding and agentic tra
 ## Data
 
 - Replay: [DaoCloud/Muse-Glimmer-OPB-100K](https://huggingface.co/datasets/DaoCloud/Muse-Glimmer-OPB-100K) — 99,984 conversations / 148,900 rows, pre-tokenized, on-policy Glimmer
-- New training traces: agent scaffold over SWE-Gym / SWE-bench-extra, repos disjoint from eval (To be released)
-  - 2000 instances across 1106 repos, 1000 slots each from SWE-Gym and SWE-bench-extra.
-  - Deduplicated on `instance_id` before sampling.
+- New training traces: [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) over SWE-Gym, repos disjoint from eval (To be released)
+  - 2000 instances, balanced round-robin across SWE-Gym's 11 repos.
+  - Every instance is checked against Docker Hub first, so each one has a prebuilt image with the
+    repo and its dependencies already installed. 37 instances were dropped for missing images.
+  - **Limitation:** SWE-bench-extra would have added ~1100 more repos, but it has no published
+    images, so it is excluded. Repo diversity is traded for environments where tests actually run.
 - Eval: Terminal-Bench, frozen 40-task subset (To be released)
   - 40 of 241 tasks, mixed across difficulty (11 easy / 20 medium / 9 hard).
   - Within each difficulty band, tasks are drawn **round-robin over category** (e.g., `games`,

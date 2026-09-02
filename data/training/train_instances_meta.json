@@ -1,11 +1,10 @@
 {
- "name": "swe-traces-train-2k",
+ "name": "swe-gym-traces-2k",
  "seed": 20260830,
  "n": 2000,
- "pool_size": 8703,
- "total_instances": 8814,
- "dropped_repo_leakage": 0,
- "dropped_duplicate_id": 111,
+ "total_instances": 2438,
+ "image_verified_pool": 2401,
+ "dropped_missing_image": 37,
  "excluded_repos": [
   "amazon-science/esci-data",
   "anurag461/lm-evaluation-harness",
@@ -17,51 +16,17 @@
   "opencv/opencv",
   "spocknots/pyknotid"
  ],
- "n_repos": 1106,
- "by_source": {
-  "nebius/SWE-bench-extra": 1113,
-  "SWE-Gym/SWE-Gym": 887
- },
- "top_repos": [
-  [
-   "dask/dask",
-   91
-  ],
-  [
-   "python/mypy",
-   91
-  ],
-  [
-   "getmoto/moto",
-   91
-  ],
-  [
-   "iterative/dvc",
-   91
-  ],
-  [
-   "modin-project/modin",
-   91
-  ],
-  [
-   "pandas-dev/pandas",
-   91
-  ],
-  [
-   "Project-MONAI/MONAI",
-   91
-  ],
-  [
-   "pydantic/pydantic",
-   83
-  ],
-  [
-   "conan-io/conan",
-   75
-  ],
-  [
-   "facebookresearch/hydra",
-   66
-  ]
- ]
+ "by_repo": {
+  "Project-MONAI/MONAI": 347,
+  "bokeh/bokeh": 25,
+  "conan-io/conan": 71,
+  "dask/dask": 141,
+  "facebookresearch/hydra": 64,
+  "getmoto/moto": 343,
+  "iterative/dvc": 219,
+  "modin-project/modin": 105,
+  "pandas-dev/pandas": 347,
+  "pydantic/pydantic": 81,
+  "python/mypy": 257
+ }
 }
