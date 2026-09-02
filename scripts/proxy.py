@@ -2,17 +2,23 @@ import json, os, hashlib, threading, time, urllib.error, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-UPSTREAM = "https://openrouter.ai/api/v1/chat/completions"
+UPSTREAM = os.environ.get("UPSTREAM_URL", "https://openrouter.ai/api/v1/chat/completions")
 PROVIDER = {"only": ["deepinfra/bf16"], "allow_fallbacks": False}
 KEY = os.environ["OPENROUTER_API_KEY"]
 LOG = Path(os.environ.get("TRACE_DIR", "data/traces/dev")) / "calls.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
 lock = threading.Lock()
+log_file = open(LOG, "a", buffering=1)
 
 
 def traj_id(messages):
     first_user = next((m for m in messages if m.get("role") == "user"), messages[0])
     return hashlib.sha1(json.dumps(first_user, sort_keys=True).encode()).hexdigest()[:16]
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    request_queue_size = 512
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -33,11 +39,13 @@ class Handler(BaseHTTPRequestHandler):
             resp, code = json.load(urllib.request.urlopen(req, timeout=900)), 200
         except urllib.error.HTTPError as e:
             resp, code = {"error": e.read().decode()[:2000]}, e.code
+        except Exception as e:
+            resp, code = {"error": f"{type(e).__name__}: {e}"[:2000]}, 502
 
         # capture: body we sent (messages + tools + sampling params) and 
         # body we get back (content, reasoning, tool_calls, usage)
-        with lock, open(LOG, "a") as f:
-            f.write(json.dumps({
+        with lock:
+            log_file.write(json.dumps({
                 "traj": traj_id(body["messages"]),
                 "ts": t0,
                 "latency": round(time.time() - t0, 3),
@@ -59,4 +67,4 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     print(f"proxy on :{port} -> {LOG}", flush=True)
-    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    Server(("0.0.0.0", port), Handler).serve_forever()

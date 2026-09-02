@@ -88,6 +88,7 @@ uv run python scripts/export_traces.py data/traces/train/calls.jsonl data/export
 
 ## Notes
 
+- Start the proxy with `ulimit -n 65535`. The default 1024 is tight once connection churn picks up.
 - The agent runs on the host and only `docker exec`s bash into the task container, so the proxy on
   `127.0.0.1` is reachable. Terminal-Bench is different: its adapter installs the agent inside the
   task container, so that run needs the proxy on `0.0.0.0`, `--add-host=host.docker.internal:host-gateway`,
@@ -113,3 +114,17 @@ while true; do docker image prune -af >/dev/null 2>&1; sleep 900; done
   and the proxy has to stay up for the whole run or capture stops silently.
 - Watch `df -h` during the first hour. If disk climbs faster than expected, `docker image prune -a`
   between slices; the shared base layers are re-pulled cheaply.
+
+## Proxy load test
+
+`scripts/loadtest_proxy.py` runs a mock upstream in-process and hammers the proxy, so proxy
+behaviour can be checked at any concurrency without spending credits:
+
+```bash
+UPSTREAM_URL=http://127.0.0.1:9099/v1/chat/completions TRACE_DIR=/tmp/lt uv run python scripts/proxy.py
+uv run python scripts/loadtest_proxy.py 120 300
+```
+
+Measured after the backlog and error-handling fixes: ~200 rps at 60 concurrent, ~70 rps at 200,
+with no dropped connections. Against a local endpoint where each call takes seconds, that is far
+more headroom than the agent can use.
