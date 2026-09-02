@@ -62,8 +62,14 @@ generation config has to match serve time or the on-policy property is lost.
 Start the recording proxy, then the agent:
 
 ```bash
-OPENROUTER_API_KEY=... TRACE_DIR=data/traces/train uv run python scripts/proxy.py
+UPSTREAM_URL=http://204.12.190.3:8000/v1/chat/completions UPSTREAM_API_KEY=... \
+  TRACE_DIR=data/traces/train uv run python scripts/proxy.py
 ```
+
+The proxy forwards the request body unchanged apart from `stream: false`. It used to inject an
+OpenRouter `provider` pin and `usage.include`, which are meaningless to vLLM and would have been
+recorded verbatim into `calls.jsonl` — that file is the training data, so it must contain only what
+the serving stack actually saw.
 
 ```bash
 uv run mini-extra swebench \

@@ -3,8 +3,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 UPSTREAM = os.environ.get("UPSTREAM_URL", "https://openrouter.ai/api/v1/chat/completions")
-PROVIDER = {"only": ["deepinfra/bf16"], "allow_fallbacks": False}
-KEY = os.environ["OPENROUTER_API_KEY"]
+KEY = os.environ.get("UPSTREAM_API_KEY") or os.environ["OPENROUTER_API_KEY"]
 LOG = Path(os.environ.get("TRACE_DIR", "data/traces/dev")) / "calls.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
 lock = threading.Lock()
@@ -26,9 +25,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        body["provider"] = PROVIDER
         body["stream"] = False
-        body["usage"] = {"include": True}
 
         req = urllib.request.Request(
             UPSTREAM, json.dumps(body).encode(),

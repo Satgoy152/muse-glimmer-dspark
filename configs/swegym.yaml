@@ -7,7 +7,7 @@ environment:
 
 model:
   cost_tracking: "ignore_errors"
-  model_name: "openai/meta/muse-glimmer-30b"
+  model_name: "openai/meta-models/Muse-Glimmer-30B"
   model_kwargs:
     api_base: "http://127.0.0.1:8080/v1"
     api_key: "proxy"
