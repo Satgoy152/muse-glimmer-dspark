@@ -93,7 +93,12 @@ uv run python scripts/export_traces.py data/traces/train/calls.jsonl data/export
   task container, so that run needs the proxy on `0.0.0.0`, `--add-host=host.docker.internal:host-gateway`,
   and `api_base` pointed at `host.docker.internal`.
 - `top_k` is passed via `extra_body` because litellm's `drop_params` strips unknown OpenAI params.
-  Confirm it survives by checking a captured request in `calls.jsonl` before running the full set.
+  Verified to survive to the wire in the smoke run.
+- The provider is pinned to `deepinfra/bf16`. Parasail no longer serves this model on OpenRouter;
+  of the four remaining providers DeepInfra is the only one declaring bf16 rather than `unknown`.
+  Pricing is $0.30/M in, $1.20/M out, $0.04/M cache read.
+- `cost_tracking: ignore_errors` is set because litellm has no price entry for this model, so
+  `cost_limit` cannot fire. `step_limit` is the only bound on a runaway trajectory.
 - Sizing: ~2000 instances at ~10 min each is ~8 hours at `-w 40`. Images are ~1.2 GB for the first
   instance of a repo and ~220 MB incremental after that, so budget ~450 GB of disk across 11 repos.
 - Run the proxy and the agent in separate tmux windows. Both outlive an ssh disconnect that way,

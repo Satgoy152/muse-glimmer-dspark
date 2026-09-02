@@ -4,7 +4,7 @@ import json, os, sys, time, urllib.request, urllib.error
 
 URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "meta/muse-glimmer-30b"
-PROVIDER = {"only": ["parasail/bf16"], "allow_fallbacks": False}
+PROVIDER = {"only": ["deepinfra/bf16"], "allow_fallbacks": False}
 
 key = os.environ.get("OPENROUTER_API_KEY")
 if not key:

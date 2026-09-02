@@ -3,7 +3,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 UPSTREAM = "https://openrouter.ai/api/v1/chat/completions"
-PROVIDER = {"only": ["parasail/bf16"], "allow_fallbacks": False}
+PROVIDER = {"only": ["deepinfra/bf16"], "allow_fallbacks": False}
 KEY = os.environ["OPENROUTER_API_KEY"]
 LOG = Path(os.environ.get("TRACE_DIR", "data/traces/dev")) / "calls.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
