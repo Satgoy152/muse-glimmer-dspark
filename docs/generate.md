@@ -107,8 +107,12 @@ uv run python scripts/export_traces.py data/traces/train/calls.jsonl data/export
   base layer. The prune loop is required, not optional — it held the run to 67 GB instead of 233 GB.
 
 ```bash
-while true; do docker image prune -af >/dev/null 2>&1; sleep 900; done
+while true; do docker container prune -f >/dev/null 2>&1; docker image prune -af >/dev/null 2>&1; sleep 900; done
 ```
+
+  The container prune is not optional. Instances whose container is created but never started
+  leave it in `Created` state, `--rm` never fires, and a lingering container pins its image — so
+  an image-only prune reports 0 B reclaimable while disk keeps climbing.
 - Cost: $0.067 per trajectory at `step_limit: 100`, so ~$135 for 2000.
 - Run the proxy and the agent in separate tmux windows. Both outlive an ssh disconnect that way,
   and the proxy has to stay up for the whole run or capture stops silently.
