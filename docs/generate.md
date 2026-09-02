@@ -99,8 +99,16 @@ uv run python scripts/export_traces.py data/traces/train/calls.jsonl data/export
   Pricing is $0.30/M in, $1.20/M out, $0.04/M cache read.
 - `cost_tracking: ignore_errors` is set because litellm has no price entry for this model, so
   `cost_limit` cannot fire. `step_limit` is the only bound on a runaway trajectory.
-- Sizing: ~2000 instances at ~10 min each is ~8 hours at `-w 40`. Images are ~1.2 GB for the first
-  instance of a repo and ~220 MB incremental after that, so budget ~450 GB of disk across 11 repos.
+- Sizing, measured on 50 instances at `-w 20`: 16 minutes, so ~11 hours for 2000. Raising `-w`
+  does not help — 22% of calls already return 429 from DeepInfra, so the provider's rate limit is
+  the ceiling, not our concurrency. litellm retries with backoff and trajectories still complete.
+- Disk: ~4.7 GB per instance, since the shuffled order means consecutive instances rarely share a
+  base layer. The prune loop is required, not optional — it held the run to 67 GB instead of 233 GB.
+
+```bash
+while true; do docker image prune -af >/dev/null 2>&1; sleep 900; done
+```
+- Cost: $0.067 per trajectory at `step_limit: 100`, so ~$135 for 2000.
 - Run the proxy and the agent in separate tmux windows. Both outlive an ssh disconnect that way,
   and the proxy has to stay up for the whole run or capture stops silently.
 - Watch `df -h` during the first hour. If disk climbs faster than expected, `docker image prune -a`

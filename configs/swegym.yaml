@@ -1,8 +1,9 @@
 agent:
-  step_limit: 60
+  step_limit: 100
 
 environment:
   environment_class: docker
+  pull_timeout: 900
 
 model:
   cost_tracking: "ignore_errors"
