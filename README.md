@@ -20,15 +20,24 @@ This project fine-tunes a speculator on curated on-policy coding and agentic tra
   - 2000 instances, balanced round-robin across SWE-Gym's 11 repos.
   - Every instance is verified with a pre-built docker image.
   - **Limitation:** SWE-bench-extra would have added ~1100 more repos (increased data variation), but it has no published images.
-- Eval: Terminal-Bench, (To be released)
+- Eval: Terminal-Bench — [Satgoy152/Muse-Glimmer-Terminal-Bench-Eval](https://huggingface.co/datasets/Satgoy152/Muse-Glimmer-Terminal-Bench-Eval) (private)
   - 40 of 241 tasks, mixed across difficulty (11 easy / 20 medium / 9 hard).
   - Within each difficulty band, tasks are drawn **round-robin over category** (e.g., `games`, `math`, `file_operations`).
 - Leakage control: the training and eval sets are checked for repo overlap before sampling.
+
+## Baseline
+
+Official DFlash drafter at 15 speculative tokens, measured on the frozen 40 with
+`--concurrent 8`: **pooled acceptance length 3.913**, draft acceptance rate
+0.194, 151.1 tok/s over 1,753 calls, and 19/39 tasks resolved (48.7%).
+Acceptance falls as reasoning strength rises, from 4.345 at `low` to 3.797 at
+`xhigh`. Per-segment numbers, caveats and coverage:
+[benchmark/terminal_bench/README.md](benchmark/terminal_bench/README.md).
 
 ## Gathering Traces
 
 - **Trace Generation Workflow:** See [docs/generate.md](docs/generate.md) for environment setup, container management, and running the recording proxy.
 - **Inference Endpoint Hosting:** See [docs/inference_hosting.md](docs/inference_hosting.md) for self-hosting the vLLM endpoint on Nebius (1x H200 GPU) with speculative decoding.
-- **Terminal-Bench Eval Run:** See [docs/terminal_bench.md](docs/terminal_bench.md) for the eval harness,
-  the in-container agent, and the leakage check.
+- **Terminal-Bench Eval Run:** See [benchmark/terminal_bench/README.md](benchmark/terminal_bench/README.md) for the eval harness,
+  the in-container agent, and the canary check.
 - **Datasets & Manifests:** See [docs/data.md](docs/data.md) for details on benchmark tasks and training instances.
