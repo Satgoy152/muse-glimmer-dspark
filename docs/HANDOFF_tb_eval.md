@@ -156,24 +156,24 @@ python scripts/export_traces.py /data/traces/tb/calls.clean.jsonl /data/export/t
 The export is 37 trajectories -- 40 tasks minus the 2 canary trajectories minus
 `word2vec-from-scratch`, which never ran.
 
-### 5. Push traces to Hugging Face
+### 5. Push traces to Hugging Face — DONE
 
-Per `docs/data.md`: private HF dataset repo, pulled with `hf download` on the GPU
-box. Versioned, resumable, content-addressed, and it exercises the release path.
+`Satgoy152/Muse-Glimmer-Terminal-Bench-Eval`, private, separate from the
+training traces. Two configs: `train` (36 trajectories) and `raw` (1,808 calls,
+request/response verbatim). Both verified to load from the Hub; canary scanned
+cell-by-cell before upload, count zero.
 
-Two constraints that matter more than the mechanism:
+Two things surfaced while building it, both now in `docs/terminal_bench.md`:
 
-- **A separate private repo from the training traces.** Same repo with a
-  different config puts one `load_dataset` typo between the project and a
-  contaminated training set. Something like
-  `<org>/muse-glimmer-tb-eval-traces`, private, with the eval-only status stated
-  in the card.
-- **Push only after step 2 passes.** Canary grep must return 0.
+* The export was picking up a hand-sent connectivity probe as its own
+  trajectory, at the chat template's default reasoning strength. Dropped via the
+  new `--require-strength` flag on `export_traces.py`; 37 -> 36.
+* `extract-safely` issued zero model calls across the whole recording -- it
+  failed before any inference, but TB recorded it as an ordinary unresolved task
+  rather than an agent error. It counts as a failure in 19/39 without having
+  exercised the model.
 
-Push the raw request/response JSON as well as anything tokenized — the raw side
-is what the leakage audit and any re-tokenization need.
-
-### 6. Commit
+### 6. Commit — DONE
 
 Commit the three outstanding files with the results, and update
 `docs/terminal_bench.md` with: the final numbers, the canary finding and how it
