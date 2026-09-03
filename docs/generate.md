@@ -99,9 +99,23 @@ uv run python scripts/export_traces.py data/traces/train/calls.jsonl data/export
 ## Notes
 
 - The agent runs on the host and only `docker exec`s bash into the task container, so the proxy on
-  `127.0.0.1` is reachable. Terminal-Bench is different: its adapter installs the agent inside the
-  task container, so that run needs the proxy on `0.0.0.0`, `--add-host=host.docker.internal:host-gateway`,
-  and `api_base` pointed at `host.docker.internal`.
+  `127.0.0.1` is reachable. Terminal-Bench is different: its adapter pip-installs mini-swe-agent
+  *inside* the task container and runs it there, so the proxy must bind `0.0.0.0` and the container
+  needs a route to it. Two things measured on the box, both of which contradict the obvious approach:
+
+  - `host.docker.internal` does **not** resolve inside a task container, and Terminal-Bench has no
+    `extra_hosts` support anywhere in the package -- tasks come up under per-task docker-compose,
+    so there is nowhere to pass `--add-host`. Point `api_base` at the docker bridge gateway
+    (`172.17.0.1`, confirm with `docker network inspect bridge`), which containers reach with no
+    host configuration. Verified: a container reached the proxy there and got a completion back.
+  - Terminal-Bench's mini-swe-agent adapter forwards only `MSWEA_CONFIGURED` and one API key into
+    the container, then runs `mini -m MODEL -t INSTRUCTION -y --exit-immediately`. There is no hook
+    for `api_base` or sampling params, so a run using it as-is would silently use default sampling
+    and lose `top_k` and `reasoning_strength`. Subclass it and override `_env`, selected with
+    `--agent-import-path module:Class`.
+
+  Give that run its own proxy port and its own `TRACE_DIR`. Terminal-Bench is the eval set; its
+  calls must never land in the training trace file.
 - `top_k` is passed via `extra_body` because litellm's `drop_params` strips unknown OpenAI params.
 - Serving is self-hosted on Nebius rather than OpenRouter. The OpenRouter route was abandoned
   because cost and rate limiting made it not worth it.
