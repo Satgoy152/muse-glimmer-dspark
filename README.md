@@ -29,4 +29,6 @@ This project fine-tunes a speculator on curated on-policy coding and agentic tra
 
 - **Trace Generation Workflow:** See [docs/generate.md](docs/generate.md) for environment setup, container management, and running the recording proxy.
 - **Inference Endpoint Hosting:** See [docs/inference_hosting.md](docs/inference_hosting.md) for self-hosting the vLLM endpoint on Nebius (1x H200 GPU) with speculative decoding.
+- **Terminal-Bench Eval Run:** See [docs/terminal_bench.md](docs/terminal_bench.md) for the eval harness,
+  the in-container agent, and the leakage check.
 - **Datasets & Manifests:** See [docs/data.md](docs/data.md) for details on benchmark tasks and training instances.
