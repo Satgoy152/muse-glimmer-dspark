@@ -50,6 +50,26 @@ def healthy(url, token, timeout=10):
         return False
 
 
+def stop_orphan_containers():
+    """Stop task containers left behind when the harness exits.
+
+    mini-swe-agent starts each task container running `sleep 2h`, so `--rm` only
+    fires when that sleep ends. Kill the harness -- as the watchdog does on a
+    preemption -- and its containers keep running for up to two hours, each
+    pinning its image so the janitor cannot reclaim the space. Measured after
+    one watchdog trip: 66 containers alive against 20 workers, holding 320 GB
+    and pushing free space under the prefetch threshold.
+
+    Only ever called with no harness running, so every match is an orphan.
+    """
+    ids = subprocess.run(["docker", "ps", "-q", "--filter", "name=minisweagent-"],
+                         capture_output=True, text=True).stdout.split()
+    if ids:
+        log(f"  stopping {len(ids)} orphaned task containers")
+        subprocess.run(["docker", "stop", "-t", "5", *ids], capture_output=True)
+    subprocess.run(["docker", "container", "prune", "-f"], capture_output=True)
+
+
 def proxy_alive(hostport):
     """TCP connect to the recording proxy.
 
@@ -265,6 +285,7 @@ def main():
             if wd:
                 wd.stop.set()
             jan.stop.set()
+            stop_orphan_containers()   # before the sweep, so images unpin first
             jan.join(timeout=30)
             jan.sweep()
 
