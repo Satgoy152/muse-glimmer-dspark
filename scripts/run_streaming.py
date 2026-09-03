@@ -13,7 +13,7 @@ Images are removed by explicit name and only for finished instances. A blanket
 `docker image prune -a` on a timer races in-flight pulls: a w=30 run lost 11/50
 instances to `docker run` exiting 125/127 under such a loop.
 """
-import argparse, json, os, shutil, signal, subprocess, threading, time
+import argparse, json, os, shutil, signal, socket, subprocess, threading, time
 import urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -50,6 +50,24 @@ def healthy(url, token, timeout=10):
         return False
 
 
+def proxy_alive(hostport):
+    """TCP connect to the recording proxy.
+
+    The harness talks to the proxy, not to the endpoint, so a healthy endpoint
+    says nothing about whether calls can actually be made. A dead proxy shows up
+    as litellm InternalServerError, which the harness treats as a failed
+    instance and writes to preds.json -- silently burning it.
+    """
+    if not hostport:
+        return True
+    host, _, port = hostport.rpartition(":")
+    try:
+        with socket.create_connection((host or "127.0.0.1", int(port)), timeout=5):
+            return True
+    except Exception:
+        return False
+
+
 def wait_for_endpoint(url, token, interval=30):
     if not url or healthy(url, token):
         return
@@ -72,9 +90,9 @@ class Watchdog(threading.Thread):
     Requires several consecutive failures so a single 504 does not trip it.
     """
 
-    def __init__(self, url, token, proc, fails=3, interval=30):
+    def __init__(self, url, token, proc, proxy=None, fails=3, interval=30):
         super().__init__(daemon=True)
-        self.url, self.token, self.proc = url, token, proc
+        self.url, self.token, self.proc, self.proxy = url, token, proc, proxy
         self.fails, self.interval = fails, interval
         self.stop, self.tripped = threading.Event(), False
 
@@ -83,11 +101,14 @@ class Watchdog(threading.Thread):
         while not self.stop.is_set():
             if self.proc.poll() is not None:
                 return
-            if healthy(self.url, self.token):
+            ok_endpoint = healthy(self.url, self.token)
+            ok_proxy = proxy_alive(self.proxy)
+            if ok_endpoint and ok_proxy:
                 consecutive = 0
             else:
                 consecutive += 1
-                log(f"  watchdog: endpoint unreachable ({consecutive}/{self.fails})")
+                what = "endpoint" if not ok_endpoint else "proxy"
+                log(f"  watchdog: {what} unreachable ({consecutive}/{self.fails})")
                 if consecutive >= self.fails:
                     self.tripped = True
                     log("  watchdog: stopping harness to avoid burning instances")
@@ -199,6 +220,8 @@ def main():
     p.add_argument("--health", default=os.environ.get("UPSTREAM_HEALTH_URL", ""),
                    help="endpoint /v1/models URL; watchdog pauses the run when it fails")
     p.add_argument("--token", default=os.environ.get("UPSTREAM_API_KEY", ""))
+    p.add_argument("--proxy", default=os.environ.get("PROXY_HOSTPORT", ""),
+                   help="host:port of the recording proxy; watchdog pauses if it dies")
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args()
 
@@ -235,7 +258,7 @@ def main():
                 start_new_session=True)  # own process group, so the watchdog can kill it whole
             # Without a health URL there is nothing to watch, so the run behaves
             # exactly as it did before rather than tripping on every check.
-            wd = Watchdog(a.health, a.token, proc) if a.health else None
+            wd = Watchdog(a.health, a.token, proc, a.proxy) if (a.health or a.proxy) else None
             if wd:
                 wd.start()
             rc = proc.wait()
