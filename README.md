@@ -18,13 +18,15 @@ This project fine-tunes a speculator on curated on-policy coding and agentic tra
 - Replay: [DaoCloud/Muse-Glimmer-OPB-100K](https://huggingface.co/datasets/DaoCloud/Muse-Glimmer-OPB-100K) — 99,984 conversations / 148,900 rows, pre-tokenized, on-policy Glimmer
 - New training traces: [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) over SWE-Gym, repos disjoint from eval (To be released)
   - 2000 instances, balanced round-robin across SWE-Gym's 11 repos.
-  - Every instance is checked against Docker Hub first, so each one has a prebuilt image with the
-    repo and its dependencies already installed. 37 instances were dropped for missing images.
-  - **Limitation:** SWE-bench-extra would have added ~1100 more repos, but it has no published
-    images, so it is excluded. Repo diversity is traded for environments where tests actually run.
-- Eval: Terminal-Bench, frozen 40-task subset (To be released)
+  - Every instance is verified with a pre-built docker image.
+  - **Limitation:** SWE-bench-extra would have added ~1100 more repos (increased data variation), but it has no published images.
+- Eval: Terminal-Bench, (To be released)
   - 40 of 241 tasks, mixed across difficulty (11 easy / 20 medium / 9 hard).
-  - Within each difficulty band, tasks are drawn **round-robin over category** (e.g., `games`,
-    `math`, `file_operations`). 21 of the 26 categories are represented.
-- Leakage control: the training and eval sets are checked for repo overlap before sampling. Every
-  GitHub repo referenced by any of the 241 Terminal-Bench task instructions are excluded from the training pool.
+  - Within each difficulty band, tasks are drawn **round-robin over category** (e.g., `games`, `math`, `file_operations`).
+- Leakage control: the training and eval sets are checked for repo overlap before sampling.
+
+## Gathering Traces
+
+- **Trace Generation Workflow:** See [docs/generate.md](docs/generate.md) for environment setup, container management, and running the recording proxy.
+- **Inference Endpoint Hosting:** See [docs/inference_hosting.md](docs/inference_hosting.md) for self-hosting the vLLM endpoint on Nebius (1x H200 GPU) with speculative decoding.
+- **Datasets & Manifests:** See [docs/data.md](docs/data.md) for details on benchmark tasks and training instances.

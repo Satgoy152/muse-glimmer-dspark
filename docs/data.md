@@ -1,6 +1,6 @@
 # Datasets
 
-All manifests are frozen by `SEED = 20260830`. Regenerate with the scripts below; output is deterministic.
+All manifests and dataset files are frozen by `SEED = 20260830` and included directly in the repository.
 
 ## Benchmark — `data/benchmark/terminal_bench_frozen40.json`
 
@@ -14,9 +14,7 @@ All manifests are frozen by `SEED = 20260830`. Regenerate with the scripts below
 - 240/241 tasks carry the Terminal-Bench canary string. Any generated trace containing that GUID
   is a leak and must be dropped.
 
-```bash
-uv run python scripts/fetch_tb_tasks.py && uv run python scripts/build_benchmark_subset.py
-```
+The 40 frozen tasks are tracked directly in `data/benchmark/terminal_bench_frozen40.json`.
 
 ## Training — `data/training/train_instances.jsonl`
 
@@ -27,19 +25,11 @@ uv run python scripts/fetch_tb_tasks.py && uv run python scripts/build_benchmark
 | SWE-Gym | 887 | 11 | large mature repos — long-horizon, deep-context trajectories |
 | SWE-bench-extra | 1113 | ~1100 | long tail — breadth |
 
-Sampled under a per-source quota, because plain round-robin over repos collapses onto the
-1974-repo long tail and starves SWE-Gym (10/2000 instances in the first pass). Per-repo cap is 5%
-of the source quota; small repos that exhaust below the cap are backfilled.
-
-- 111 duplicate `instance_id`s dropped (the two sources overlap on `iterative/dvc` and
-  `pydantic/pydantic`).
+- 111 duplicate `instance_id`s dropped.
 - Leakage exclusion: every repo referenced by *any* of the 241 Terminal-Bench tasks (9 repos), not
-  just the frozen 40. Zero instances matched, so the sets were already disjoint — the check stays
-  in the script so it holds if either set changes.
+  just the frozen 40.
 
-```bash
-uv run python scripts/build_training_manifest.py
-```
+The instance metadata is tracked directly in `data/training/train_instances.jsonl`, and the full problem dataset formatted for `mini-swe-agent` (`datasets.load_dataset`) is tracked in `data/training/swegym_2k/train.jsonl`.
 
 ## Getting traces onto the GPU box
 
