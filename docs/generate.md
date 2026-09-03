@@ -54,16 +54,35 @@ Then check the captured request, which is the only place these are observable:
 head -1 data/traces/smoke/calls.jsonl | uv run python -c "import json,sys; r=json.load(sys.stdin)['request']; print({k: r.get(k) for k in ('model','temperature','top_p','top_k','provider')})"
 ```
 
-`top_k` must be `64`. If it is missing, litellm dropped it and the proxy has to set it instead —
-generation config has to match serve time or the on-policy property is lost.
+`top_k` must be `64` and `chat_template_kwargs` must carry the slice's `reasoning_strength`. If
+either is missing, litellm dropped it and the proxy has to set it instead — generation config has
+to match serve time or the on-policy property is lost.
+
+Reasoning effort is **not** OpenRouter's `reasoning.effort`. Muse Glimmer reads it from its chat
+template as `reasoning_strength`, and vLLM accepts unknown top-level body fields without error, so
+sending `reasoning.effort` fails silently: every slice renders "Reasoning strength: high." and the
+four-way mix collapses to one setting with nothing in the logs to show it. Measured against the
+served model, `low` averages ~530 reasoning chars and `xhigh` ~2750, so a working mix is visible
+in the trace lengths.
 
 ## Run
 
 Start the recording proxy, then the agent:
 
 ```bash
-UPSTREAM_URL=http://204.12.190.3:8000/v1/chat/completions UPSTREAM_API_KEY=... \
+UPSTREAM_URL=https://<endpoint-host>/v1/chat/completions \
+  UPSTREAM_API_KEY=<nebius-endpoint-token> \
   TRACE_DIR=data/traces/train uv run python scripts/proxy.py
+```
+
+The endpoint token is the one on the serverless endpoint's Token authentication
+card, not a model key -- vLLM is started without `--api-key` and ignores the
+header, so the token is only there to satisfy the tunnel gateway in front of it.
+If the gateway rejects `Bearer`, override the scheme rather than editing the
+proxy:
+
+```bash
+UPSTREAM_AUTH_SCHEME=Api-Key    # or: UPSTREAM_AUTH_HEADER=X-Api-Key UPSTREAM_AUTH_SCHEME=
 ```
 
 The proxy forwards the request body unchanged apart from `stream: false`. It used to inject an
@@ -72,16 +91,30 @@ recorded verbatim into `calls.jsonl` — that file is the training data, so it m
 the serving stack actually saw.
 
 ```bash
-uv run mini-extra swebench \
-  --subset data/training/swegym_2k --split train --slice 0:600 \
-  -c swebench.yaml -c configs/swegym.yaml \
-  -c model.model_kwargs.reasoning_effort=low \
-  -w 40 -o runs/train-low
+uv run python scripts/run_streaming.py --window 60 --workers 30 --out /data/runs/train
 ```
 
-Repeat for the remaining slices to get the reasoning mix: `600:1200` medium, `1200:1800` high,
-`1800:2000` xhigh. mini-swe-agent's config is static per run, so the mix comes from separate runs
-rather than per-instance sampling.
+`run_streaming.py` walks the whole 2000 in the four effort segments, one harness process each, and
+runs a janitor alongside that keeps a sliding window of images: it pulls ahead of the frontier and
+deletes each instance's image as soon as that instance's trajectory lands. Images are ~6 GB each on
+disk after dedup, so the full set is ~12 TB against a 1 TB volume and cannot be resident at once.
+
+Deletion is by explicit image name. A blanket `docker image prune -a` on a timer races in-flight
+pulls: a `-w 30` run lost 11/50 instances to `docker run` exiting 125/127 under such a loop.
+
+Verified at `--window 6` over 12 instances: peak 7 resident images, 12/12 trajectories, 0 errors.
+
+To run a single segment by hand instead:
+
+```bash
+uv run mini-extra swebench \
+  --subset data/training/swegym_2k --split train --slice 0:600 \
+  -c swebench.yaml -c configs/swegym.yaml -c configs/effort_low.yaml \
+  -w 30 -o runs/train-low
+```
+
+mini-swe-agent's config is static per run, so the mix comes from separate runs rather than
+per-instance sampling.
 
 `-c swebench.yaml` must be passed explicitly — naming any config replaces the default rather than
 adding to it. Configs merge recursively, so `configs/swegym.yaml` only overrides the model block.
@@ -101,14 +134,14 @@ uv run python scripts/export_traces.py data/traces/train/calls.jsonl data/export
   and `api_base` pointed at `host.docker.internal`.
 - `top_k` is passed via `extra_body` because litellm's `drop_params` strips unknown OpenAI params.
   Verified to survive to the wire in the smoke run.
-- The provider is pinned to `deepinfra/bf16`. Parasail no longer serves this model on OpenRouter;
-  of the four remaining providers DeepInfra is the only one declaring bf16 rather than `unknown`.
-  Pricing is $0.30/M in, $1.20/M out, $0.04/M cache read.
+- Serving is self-hosted on Nebius rather than OpenRouter. The OpenRouter route was abandoned
+  because cost and rate limiting made it not worth it: 22% of calls returned 429 from DeepInfra,
+  which capped throughput below what the harness could drive.
 - `cost_tracking: ignore_errors` is set because litellm has no price entry for this model, so
   `cost_limit` cannot fire. `step_limit` is the only bound on a runaway trajectory.
-- Sizing, measured on 50 instances at `-w 20`: 16 minutes, so ~11 hours for 2000. Raising `-w`
-  does not help — 22% of calls already return 429 from DeepInfra, so the provider's rate limit is
-  the ceiling, not our concurrency. litellm retries with backoff and trajectories still complete.
+- Sizing, measured on 50 instances at `-w 20` against OpenRouter: 16 minutes, so ~11 hours for
+  2000. That number was set by DeepInfra's rate limit, not by our concurrency, so it does not
+  carry over to the self-hosted endpoint -- re-measure `-w` against vLLM before sizing the run.
 - Disk: ~4.7 GB per instance, since the shuffled order means consecutive instances rarely share a
   base layer. The prune loop is required, not optional — it held the run to 67 GB instead of 233 GB.
 
@@ -119,7 +152,8 @@ while true; do docker container prune -f >/dev/null 2>&1; docker image prune -af
   The container prune is not optional. Instances whose container is created but never started
   leave it in `Created` state, `--rm` never fires, and a lingering container pins its image — so
   an image-only prune reports 0 B reclaimable while disk keeps climbing.
-- Cost: $0.067 per trajectory at `step_limit: 100`, so ~$135 for 2000.
+- Cost is now GPU-hours on the 8xH200 endpoint rather than per-token, so the run should be sized
+  to keep the endpoint busy: idle GPU time is the expensive failure mode, not token spend.
 - Run the proxy and the agent in separate tmux windows. Both outlive an ssh disconnect that way,
   and the proxy has to stay up for the whole run or capture stops silently.
 - Watch `df -h` during the first hour. If disk climbs faster than expected, `docker image prune -a`
