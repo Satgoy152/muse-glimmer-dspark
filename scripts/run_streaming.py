@@ -13,7 +13,8 @@ Images are removed by explicit name and only for finished instances. A blanket
 `docker image prune -a` on a timer races in-flight pulls: a w=30 run lost 11/50
 instances to `docker run` exiting 125/127 under such a loop.
 """
-import argparse, json, shutil, subprocess, threading, time
+import argparse, json, os, shutil, signal, subprocess, threading, time
+import urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -39,6 +40,63 @@ def resident_images():
     r = subprocess.run(["docker", "images", "--format", "{{.Repository}}"],
                        capture_output=True, text=True)
     return {ln.strip() for ln in r.stdout.splitlines() if ln.strip()}
+
+
+def healthy(url, token, timeout=10):
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"} if token else {})
+    try:
+        return urllib.request.urlopen(req, timeout=timeout).status == 200
+    except Exception:
+        return False
+
+
+def wait_for_endpoint(url, token, interval=30):
+    if not url or healthy(url, token):
+        return
+    log(f"  endpoint unreachable, waiting for it to return: {url}")
+    t0 = time.time()
+    while not healthy(url, token):
+        time.sleep(interval)
+    log(f"  endpoint back after {time.time()-t0:.0f}s")
+
+
+class Watchdog(threading.Thread):
+    """Stop the harness when the endpoint goes away.
+
+    These endpoints are preemptible. Left alone, the harness keeps handing
+    instances to a dead upstream; litellm retries, gives up, and the instance
+    lands in preds.json as done -- so it is skipped on resume and lost. Killing
+    the harness instead leaves those instances simply unfinished, and the next
+    pass picks them up.
+
+    Requires several consecutive failures so a single 504 does not trip it.
+    """
+
+    def __init__(self, url, token, proc, fails=3, interval=30):
+        super().__init__(daemon=True)
+        self.url, self.token, self.proc = url, token, proc
+        self.fails, self.interval = fails, interval
+        self.stop, self.tripped = threading.Event(), False
+
+    def run(self):
+        consecutive = 0
+        while not self.stop.is_set():
+            if self.proc.poll() is not None:
+                return
+            if healthy(self.url, self.token):
+                consecutive = 0
+            else:
+                consecutive += 1
+                log(f"  watchdog: endpoint unreachable ({consecutive}/{self.fails})")
+                if consecutive >= self.fails:
+                    self.tripped = True
+                    log("  watchdog: stopping harness to avoid burning instances")
+                    try:
+                        os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
+                    except Exception as e:
+                        log(f"  watchdog: killpg failed: {e}")
+                    return
+            self.stop.wait(self.interval)
 
 
 def in_use(image):
@@ -138,6 +196,9 @@ def main():
     p.add_argument("--end", type=int, default=2000)
     p.add_argument("--pull-jobs", type=int, default=8)
     p.add_argument("--min-free-gb", type=float, default=150)
+    p.add_argument("--health", default=os.environ.get("UPSTREAM_HEALTH_URL", ""),
+                   help="endpoint /v1/models URL; watchdog pauses the run when it fails")
+    p.add_argument("--token", default=os.environ.get("UPSTREAM_API_KEY", ""))
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args()
 
@@ -153,23 +214,43 @@ def main():
             log(f"{tag}: {hi-lo} instances, window={a.window}, -w {a.workers}")
             continue
 
-        log(f"{tag}: starting, window={a.window}, free={free_gb():.0f}G")
-        jan = Janitor(rows, lo, hi, out, a.window, a.pull_jobs, a.min_free_gb)
-        jan.prestage()
-        jan.start()
-        t0 = time.time()
-        r = subprocess.run(
-            ["uv", "run", "mini-extra", "swebench",
-             "--subset", a.subset, "--split", a.split, "--slice", f"{lo}:{hi}",
-             "-c", "swebench.yaml", "-c", "configs/swegym.yaml", "-c", f"configs/effort_{effort}.yaml",
-             "-w", str(a.workers), "-o", str(out)])
-        jan.stop.set()
-        jan.join(timeout=30)
-        jan.sweep()  # final release of whatever finished last
+        attempt = 0
+        while True:
+            attempt += 1
+            jan = Janitor(rows, lo, hi, out, a.window, a.pull_jobs, a.min_free_gb)
+            if all(jan.done(j) for j in range(lo, hi)):
+                log(f"{tag}: complete")
+                break
+            wait_for_endpoint(a.health, a.token)   # no-op when --health is unset
+            log(f"{tag}: starting (attempt {attempt}), window={a.window}, free={free_gb():.0f}G")
+            jan.prestage()
+            jan.start()
+            t0 = time.time()
+            proc = subprocess.Popen(
+                ["uv", "run", "mini-extra", "swebench",
+                 "--subset", a.subset, "--split", a.split, "--slice", f"{lo}:{hi}",
+                 "-c", "swebench.yaml", "-c", "configs/swegym.yaml",
+                 "-c", f"configs/effort_{effort}.yaml",
+                 "-w", str(a.workers), "-o", str(out)],
+                start_new_session=True)  # own process group, so the watchdog can kill it whole
+            # Without a health URL there is nothing to watch, so the run behaves
+            # exactly as it did before rather than tripping on every check.
+            wd = Watchdog(a.health, a.token, proc) if a.health else None
+            if wd:
+                wd.start()
+            rc = proc.wait()
+            if wd:
+                wd.stop.set()
+            jan.stop.set()
+            jan.join(timeout=30)
+            jan.sweep()
 
-        done = sum(jan.done(j) for j in range(lo, hi))
-        log(f"{tag}: exit={r.returncode} {done}/{hi-lo} trajectories in {time.time()-t0:.0f}s "
-            f"(pulled {jan.pulled}, released {jan.deleted}, free={free_gb():.0f}G)")
+            done = sum(jan.done(j) for j in range(lo, hi))
+            log(f"{tag}: exit={rc} {done}/{hi-lo} trajectories in {time.time()-t0:.0f}s "
+                f"(pulled {jan.pulled}, released {jan.deleted}, free={free_gb():.0f}G)")
+            if not (wd and wd.tripped):
+                break
+            log(f"{tag}: harness stopped by watchdog, will resume when the endpoint returns")
 
 
 if __name__ == "__main__":
