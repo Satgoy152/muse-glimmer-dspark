@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Freeze a 40-task Terminal-Bench eval subset, stratified by difficulty x category."""
 import json, random, collections
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
 
 SEED = 20260830
 N = 40
 CANON = {"games": "games", "game": "games", "math": "mathematics", "mathematics": "mathematics",
          "file_operations": "file-operations", "file-operations": "file-operations"}
 
-d = json.load(open("data/raw/tb_tasks.json"))
+d = json.load(open(ROOT / "data/raw/tb_tasks.json"))
 tasks = [t for t in d["tasks"] if t["difficulty"] in ("easy", "medium", "hard")]
 for t in tasks:
     t["category_norm"] = CANON.get(t["category"], t["category"])
@@ -59,5 +63,5 @@ out = {
                "category": t["category_norm"], "repos_mentioned": t["repos_mentioned"]}
               for t in picked],
 }
-json.dump(out, open("data/benchmark/terminal_bench_frozen40.json", "w"), indent=1)
+json.dump(out, open(HERE / "tasks_frozen40.json", "w"), indent=1)
 print(json.dumps({k: out[k] for k in ("n", "difficulty", "category", "excluded_repos")}, indent=1))

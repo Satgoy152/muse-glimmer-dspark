@@ -2,7 +2,7 @@
 
 All manifests and dataset files are frozen by `SEED = 20260830` and included directly in the repository.
 
-## Benchmark — `data/benchmark/terminal_bench_frozen40.json`
+## Benchmark — `benchmark/terminal_bench/tasks_frozen40.json`
 
 40 of 241 Terminal-Bench tasks, pinned to tree `d28711d0` of `harbor-framework/terminal-bench-1`
 (the `laude-institute/terminal-bench` URL now redirects there).
@@ -14,7 +14,7 @@ All manifests and dataset files are frozen by `SEED = 20260830` and included dir
 - 240/241 tasks carry the Terminal-Bench canary string. Any generated trace containing that GUID
   is a leak and must be dropped.
 
-The 40 frozen tasks are tracked directly in `data/benchmark/terminal_bench_frozen40.json`.
+The 40 frozen tasks are tracked directly in `benchmark/terminal_bench/tasks_frozen40.json`.
 
 ## Training — `data/training/train_instances.jsonl`
 
