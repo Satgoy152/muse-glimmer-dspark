@@ -1,5 +1,7 @@
+# Muse Glimmer's chat template reads `reasoning_strength`; the OpenAI-style
+# `reasoning_effort` is validated by vLLM and then ignored. See docs/generate.md.
 model:
   model_kwargs:
     extra_body:
-      reasoning:
-        effort: high
+      chat_template_kwargs:
+        reasoning_strength: high
