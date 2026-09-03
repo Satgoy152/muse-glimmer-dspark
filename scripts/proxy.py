@@ -3,7 +3,17 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 UPSTREAM = os.environ.get("UPSTREAM_URL", "https://openrouter.ai/api/v1/chat/completions")
-KEY = os.environ.get("UPSTREAM_API_KEY") or os.environ["OPENROUTER_API_KEY"]
+KEY = os.environ.get("UPSTREAM_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
+
+# The Nebius tunnel gateway authenticates in front of vLLM and its scheme is not
+# necessarily Bearer, so both are overridable. An unset key sends no header at
+# all, which is what vLLM started without --api-key wants.
+AUTH_HEADER = os.environ.get("UPSTREAM_AUTH_HEADER", "Authorization")
+AUTH_SCHEME = os.environ.get("UPSTREAM_AUTH_SCHEME", "Bearer")
+
+HEADERS = {"Content-Type": "application/json"}
+if KEY:
+    HEADERS[AUTH_HEADER] = f"{AUTH_SCHEME} {KEY}".strip()
 LOG = Path(os.environ.get("TRACE_DIR", "data/traces/dev")) / "calls.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
 lock = threading.Lock()
@@ -27,10 +37,7 @@ class Handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         body["stream"] = False
 
-        req = urllib.request.Request(
-            UPSTREAM, json.dumps(body).encode(),
-            {"Authorization": f"Bearer {KEY}", "Content-Type": "application/json"},
-        )
+        req = urllib.request.Request(UPSTREAM, json.dumps(body).encode(), dict(HEADERS))
         t0 = time.time()
         try:
             resp, code = json.load(urllib.request.urlopen(req, timeout=900)), 200
