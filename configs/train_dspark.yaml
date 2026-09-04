@@ -1,0 +1,98 @@
+# DSpark drafter for meta-models/Muse-Glimmer-30B, fine-tuned on agentic coding
+# traces. Run with:
+#
+#   torchrun --standalone --nproc-per-node 1 -m speculators.train \
+#     --config configs/train_dspark.yaml
+#
+# Anything here can be overridden on the command line (flag > yaml > default).
+# `--print-config` dumps the fully resolved result; keep that with the run.
+
+speculator_type: dspark
+seed: 20260830
+
+verifier:
+  verifier_name_or_path: meta-models/Muse-Glimmer-30B
+  # MuseGlimmerForConditionalGeneration ships in transformers 5.15; flip this on
+  # if AutoConfig cannot resolve muse_glimmer on the pinned version.
+  trust_remote_code: false
+
+draft:
+  # Warm start from the community DSpark rather than random init. It fixes the
+  # decoder shape (5 layers, hidden 6656, sliding window 2048), so num_layers /
+  # draft_arch / sliding_window / full_attention_indices must stay unset --
+  # resolution.py rejects them alongside from_pretrained.
+  from_pretrained: DaoCloud/Muse-Glimmer-30B-DSpark
+  # Mirrors aux_hidden_state_layer_ids in that checkpoint's config.json. The
+  # extraction server takes the same five and appends layer 52 (the verifier
+  # hidden state); training takes the auxiliary layers only.
+  target_layer_ids: [2, 14, 26, 38, 50]
+  draft_vocab_size: 202048   # full verifier vocab, no d2t/t2d mapping
+  mask_token_id: 201818
+
+data:
+  data_path: runs/dspark/data
+  # MUST equal prepare-data --seq-length. See docs/train.md: the window decides
+  # how much of the workload survives, and a mismatch here silently re-clips.
+  total_seq_len: 16384
+  train_data_ratio: 0.99
+  hidden_states_backend: file
+  hidden_states_dtype: bfloat16
+  # 6 layers x 6656 x 2 B = ~78 KB per token, so a 16,384-token row carries
+  # ~1.3 GB of hidden states. The stock 12 workers x 4 prefetch would hold ~60 GB
+  # of them in host RAM.
+  num_workers: 2
+  prefetch_factor: 2
+  # Supervised tokens per row are small here (median 93, mean 178 assistant
+  # tokens per turn), so 512 anchors is not the binding constraint.
+  max_anchors: 512
+
+dflash:
+  # 15 matches the baseline's num_speculative_tokens, so acceptance length is
+  # measured at the same draft length and is directly comparable. Changing it
+  # invalidates the comparison against 3.913.
+  block_size: 15
+  sample_from_anchor: true
+  dflash_decay_gamma: 4.0
+
+dspark:
+  markov_rank: 256
+  markov_head_type: vanilla
+  enable_confidence_head: true
+  confidence_head_with_markov: true
+  confidence_head_alpha: 1.0
+
+loss:
+  loss_fn: '{"ce": 0.1, "tv": 0.9}'
+
+optimizer:
+  optimizer: muon
+  # Lower than the 1e-4 the from-scratch examples use: this is a fine-tune of a
+  # converged drafter, and the risk is washing out the general-chat competence
+  # rather than failing to fit 1,981 trajectories.
+  lr: 5e-5
+
+scheduler:
+  scheduler_type: cosine
+  scheduler_warmup_ratio: 0.03
+
+trainer:
+  epochs: 1
+  # The GPU node is preemptible. 0.1 = ten checkpoints per epoch, onto the
+  # persistent volume; mirror to HF only at the end.
+  checkpoint_freq: 0.1
+  save_best: true
+  save_path: runs/dspark/checkpoints
+
+generation:
+  # Online extraction: hidden states are produced by the live server and deleted
+  # after use. Caching them is not an option -- at 16,384 tokens a row is ~1.3 GB
+  # and the full prepared set would be tens of TB.
+  vllm_endpoint: http://127.0.0.1:8000/v1
+  on_missing: generate
+  on_generate: delete
+  request_timeout: 900
+  max_retries: 5
+
+logging:
+  run_name: dspark-swegym-2k
+  log_dir: runs/dspark/logs

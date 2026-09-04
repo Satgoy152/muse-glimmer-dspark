@@ -41,3 +41,10 @@ Acceptance falls as reasoning strength rises, from 4.345 at `low` to 3.797 at
 - **Terminal-Bench Eval Run:** See [benchmark/terminal_bench/README.md](benchmark/terminal_bench/README.md) for the eval harness,
   the in-container agent, and the canary check.
 - **Datasets & Manifests:** See [docs/data.md](docs/data.md) for details on benchmark tasks and training instances.
+
+## Training
+
+- **Speculator Training:** See [docs/train.md](docs/train.md) for the seq-length
+  budget, the render/extraction server, and the DSpark fine-tune. Warm start is
+  `DaoCloud/Muse-Glimmer-30B-DSpark`; `block_size` is pinned to 15 so acceptance
+  length stays comparable to the baseline above.

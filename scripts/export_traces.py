@@ -63,8 +63,9 @@ def main(src, outdir, require_strength=False):
         for msgs, tools, final, strength, traj in trajectories.values():
             msgs = bake_strength(msgs, strength)
             assistant = {k: v for k, v in final.items() if v is not None}
-            # `messages` is the key speculators' build_speculator_training_dataset reads;
-            # it renders and derives the loss mask itself, so nothing here is tokenized.
+            # Nothing here is tokenized: speculators renders and derives the loss mask
+            # itself. It reads a `conversations` column, not `messages` -- see
+            # scripts/build_train_jsonl.py, which renames this on the way in.
             train.write(json.dumps({"id": traj, "messages": msgs + [assistant], "tools": tools,
                                     "reasoning_strength": strength}) + "\n")
             bench.write(json.dumps({"id": traj, "messages": msgs, "tools": tools,
