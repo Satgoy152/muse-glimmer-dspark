@@ -1,0 +1,30 @@
+[Unit]
+Description=DSpark speculator training pipeline (resumable)
+After=vllm-extract.service
+Wants=vllm-extract.service
+RequiresMountsFor=/mnt/data
+
+[Service]
+Type=simple
+User=sagoyal
+WorkingDirectory=/mnt/data/src/muse-glimmer-dspark
+EnvironmentFile=-/mnt/data/runs/run.env
+Environment=DATA_ROOT=/mnt/data
+Environment=HF_HOME=/mnt/data/hf
+# The pipeline runs inside the same image as the server so torch, transformers
+# and vLLM are identical on both sides of the hidden-state transfer.
+ExecStart=/usr/bin/sudo /usr/bin/docker run --rm --name dspark-train \
+  --gpus all --network host --ipc host \
+  -v /mnt/data:/mnt/data -v /dev/shm:/dev/shm \
+  --env-file /mnt/data/runs/run.env \
+  specd:latest bash /mnt/data/src/muse-glimmer-dspark/scripts/pipeline.sh
+ExecStop=/usr/bin/sudo /usr/bin/docker stop -t 60 dspark-train
+# Every stage is marker-guarded and training resumes from its checkpoint, so a
+# restart continues rather than repeats. RestartSec covers the case where the
+# endpoint is still reloading after a shared preemption.
+Restart=always
+RestartSec=60
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

@@ -41,6 +41,20 @@ TP="${TP:-4}"
 # arrives as one batch and the token budget must cover a full sequence.
 MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-$((SEQ_LENGTH + 1))}"
 
+# The hidden-state cache is a KV cache group of its own, and vLLM aligns its
+# page to the attention page. Muse Glimmer is GQA 32:2 with head_dim 128, so at
+# the default block size its attention page is only 2 x 128 x 2 x 2 x 16 =
+# 16,384 B, while one token of hidden state is 6 x 6656 x 2 = 79,872 B. The
+# alignment in kv_cache_utils._get_kv_cache_groups then clamps the hidden-state
+# block size to 1 and still overflows, tripping
+#   assert self.page_size_padded >= self.unpadded_page_size_bytes
+# in kv_cache_interface.py during cudagraph memory profiling.
+#
+# block_size 128 lifts the attention page to 131,072 B, the first power of two
+# above 79,872, which is the smallest value that lets the alignment succeed. It
+# costs 39% padding waste inside the hidden-state cache.
+BLOCK_SIZE="${BLOCK_SIZE:-128}"
+
 # Whether a prefix-cache hit still yields hidden states for the cached span is
 # unverified -- see docs/train.md. `off` is the safe default and what the
 # upstream large-model example uses; `on` is worth measuring, because turns in
@@ -64,5 +78,6 @@ exec python3 "${SPECULATORS_DIR}/scripts/launch_vllm.py" "${MODEL}" \
   --gpu-memory-utilization "${GPU_MEM_UTIL:-0.90}" \
   --max-num-seqs "${MAX_NUM_SEQS:-32}" \
   --max-num-batched-tokens "${MAX_NUM_BATCHED_TOKENS}" \
+  --block-size "${BLOCK_SIZE}" \
   --no-enable-chunked-prefill \
   "${PREFIX_ARGS[@]}"

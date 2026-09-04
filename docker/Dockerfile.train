@@ -1,0 +1,35 @@
+# vLLM nightly + speculators + hs_connectors, in one image.
+#
+# One image runs both halves of training: the extraction server
+# (scripts/launch_vllm.py, which imports hs_connectors) and the trainer
+# (torchrun -m speculators.train). Keeping them in the same image is what makes
+# the torch/transformers/vLLM versions provably identical on both sides -- a
+# separate trainer env is the usual way to end up with a torch that disagrees
+# with the CUDA driver the server is using.
+#
+# Install order matters:
+#   1. setuptools-git-versioning -- speculators' build backend needs it, and
+#      --no-build-isolation means pip will not fetch it on its own.
+#   2. hs_connectors before speculators, so the workspace member is not pulled
+#      from the index under a different version.
+#   3. --no-build-isolation for speculators so the build sees the image's torch
+#      (2.13.0+cu130) instead of resolving a fresh one and shadowing vLLM's.
+#
+# Verified on vllm/vllm-openai:nightly @ 0.28.1rc1.dev388+g8a728663c: none of
+# torch, transformers or vllm is touched by the install.
+ARG VLLM_BASE=vllm/vllm-openai:nightly
+FROM ${VLLM_BASE}
+
+USER root
+COPY speculators /opt/speculators
+RUN pip install --no-cache-dir setuptools-git-versioning \
+    && pip install --no-cache-dir /opt/speculators/hs_connectors \
+    && pip install --no-cache-dir --no-build-isolation /opt/speculators \
+    && python3 -c "import hs_connectors, speculators, vllm, torch; print(torch.__version__, vllm.__version__)"
+
+ENV HF_HOME=/mnt/data/hf
+ENV VLLM_LOGGING_LEVEL=INFO
+# launch_vllm.py is a script in the source tree, not a console entry point.
+ENV SPECULATORS_DIR=/opt/speculators
+WORKDIR /work
+ENTRYPOINT []

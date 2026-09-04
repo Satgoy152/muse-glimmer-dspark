@@ -295,6 +295,86 @@ What each step is actually testing, in the order it fails:
 Then repeat step 3 with `PREFIX_CACHING=on` and compare wall-clock. That answers
 the TP-vs-DP question for the real run.
 
+## Verified on hardware (1xH200, vLLM 0.28.1rc1.dev388+g8a728663c)
+
+Everything below was run on a preemptible Nebius node: 1x H200 (143 GB),
+16 vCPU, 196 GB RAM, plus a 279 GB persistent disk mounted at `/mnt/data`.
+
+### `hs_connectors` is not shipped with vLLM
+
+The stock `vllm/vllm-openai:nightly` image has
+`vllm/distributed/kv_transfer/kv_connector/v1/example_hidden_states_connector.py`
+and `vllm/v1/spec_decode/extract_hidden_states.py`, but `import hs_connectors`
+fails. It is a separate package that lives in the speculators repo and has to be
+installed into the vLLM environment. `docker/Dockerfile.train` does that, and
+the order matters:
+
+```
+pip install setuptools-git-versioning        # speculators' build backend
+pip install <speculators>/hs_connectors      # before speculators itself
+pip install --no-build-isolation <speculators>
+```
+
+Without `--no-build-isolation` the speculators build resolves its own torch and
+shadows vLLM's. With it, torch 2.13.0+cu130, transformers and vllm are all left
+untouched -- checked after install.
+
+### `--block-size 128` is mandatory, or the engine will not start
+
+Muse Glimmer is GQA 32:2 with `head_dim` 128, so one attention page at the
+default block size is `2 x 128 x 2 x 2 x 16 = 16,384 B`. One token of hidden
+state is `6 x 6656 x 2 = 79,872 B`. `kv_cache_utils._get_kv_cache_groups` aligns
+the hidden-state group's page to the attention page, clamps its block size to 1,
+and still overflows:
+
+```
+File ".../vllm/v1/kv_cache_interface.py", line 428, in page_size_bytes
+    assert self.page_size_padded >= self.unpadded_page_size_bytes
+AssertionError
+```
+
+`--block-size 128` lifts the attention page to 131,072 B, the first power of two
+above 79,872. The engine then logs
+
+```
+Using block size 1 for hidden-state cache layer cache_only_layers.52;
+page alignment wastes 51200 bytes (39.06%) per block
+```
+
+and starts. That 39% is unavoidable padding in the hidden-state cache, and it is
+what makes the window ceiling below as low as it is.
+
+### Extraction works, and the width is 6656
+
+A `max_tokens=1` completion over 64 token ids returned, via the connector:
+
+```
+hidden_states (64, 6, 6656) torch.bfloat16
+token_ids (64,) match: True     finite: True
+per-layer norms: [764, 1600, 1720, 2000, 3952, 8960]
+```
+
+So `model_config.get_hidden_size()` resolves to `text_config.hidden_size`, not
+the top-level `out_hidden_size: 6144`. That smoke-test risk is closed.
+
+### One H200 caps the window at ~34,600 tokens
+
+At `--max-model-len 49153` and `--gpu-memory-utilization 0.92` the engine
+refuses to start:
+
+```
+To serve at least one request with the model's max seq len (49153),
+80.45 GiB KV cache is needed, which is larger than the available KV cache
+memory (56.69 GiB). Based on the available memory, the estimated maximum
+model length is 34639.
+```
+
+The hidden-state cache dominates that budget. **49,152 is not reachable on a
+single H200**, and 34,639 is the ceiling before any trainer shares the card, so
+32,768 is the working window here. Reaching 49,152 needs the weights sharded
+across more than one GPU to free cache -- which is the argument for TP that
+`serve_extract.sh` already carries, now with a measured number behind it.
+
 ## Machine
 
 One H200 is enough for a single-GPU run, but vLLM and the trainer then share it:
