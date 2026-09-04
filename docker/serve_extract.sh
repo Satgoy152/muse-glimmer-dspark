@@ -66,6 +66,15 @@ else
   PREFIX_ARGS=(--no-enable-prefix-caching)
 fi
 
+# Every trajectory in this dataset carries `tools`, and the render endpoint
+# rejects a request with tools unless the server was started to parse tool
+# calls: {"message": "\"auto\" tool choice requires --enable-auto-tool-choice
+# and --tool-call-parser to be set", "code": 400}. speculators catches that per
+# conversation and returns no rows, so prepare-data reports only "No samples
+# remain after preprocessing. Check the dataset schema, assistant masking, and
+# --minimum-valid-tokens" -- none of which is the actual cause.
+TOOL_ARGS=(--enable-auto-tool-choice --tool-call-parser "${TOOL_CALL_PARSER:-muse_glimmer}")
+
 mkdir -p "${HIDDEN_STATES_PATH}"
 
 exec python3 "${SPECULATORS_DIR}/scripts/launch_vllm.py" "${MODEL}" \
@@ -79,5 +88,6 @@ exec python3 "${SPECULATORS_DIR}/scripts/launch_vllm.py" "${MODEL}" \
   --max-num-seqs "${MAX_NUM_SEQS:-32}" \
   --max-num-batched-tokens "${MAX_NUM_BATCHED_TOKENS}" \
   --block-size "${BLOCK_SIZE}" \
+  "${TOOL_ARGS[@]}" \
   --no-enable-chunked-prefill \
   "${PREFIX_ARGS[@]}"
