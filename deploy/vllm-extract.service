@@ -1,6 +1,6 @@
 [Unit]
 Description=vLLM target server for hidden-state extraction and rendering
-After=docker.service network-online.target mnt-data.mount
+After=docker.service network-online.target
 Requires=docker.service
 # The whole run lives on /mnt/data; starting without it would rebuild state on
 # the ephemeral root disk and lose it at the next preemption.
@@ -9,17 +9,17 @@ RequiresMountsFor=/mnt/data
 [Service]
 Type=simple
 User=sagoyal
-Environment=HF_HOME=/mnt/data/hf
-Environment=SPECULATORS_DIR=/opt/speculators
-Environment=HIDDEN_STATES_PATH=/dev/shm/hidden_states
-EnvironmentFile=-/mnt/data/runs/run.env
+# Every setting is passed with --env-file, not with systemd Environment= plus a
+# pass-through `-e VAR`. ExecStart runs under sudo, and sudo's env_reset drops
+# the unit's environment before docker ever sees it, so the pass-through form
+# silently hands the container empty values and the server comes up on
+# serve_extract.sh's defaults -- wrong window, wrong TP, no warning.
 ExecStartPre=-/usr/bin/sudo /usr/bin/docker rm -f vllm-extract
 ExecStartPre=/bin/mkdir -p /dev/shm/hidden_states
 ExecStart=/usr/bin/sudo /usr/bin/docker run --rm --name vllm-extract \
   --gpus all --network host --ipc host \
   -v /mnt/data:/mnt/data -v /dev/shm:/dev/shm \
-  -e HF_HOME -e SPECULATORS_DIR -e HIDDEN_STATES_PATH \
-  -e SEQ_LENGTH -e TP -e GPU_MEM_UTIL -e MAX_NUM_SEQS -e BLOCK_SIZE -e PREFIX_CACHING \
+  --env-file /mnt/data/runs/run.env \
   specd:latest bash /mnt/data/src/muse-glimmer-dspark/docker/serve_extract.sh
 ExecStop=/usr/bin/sudo /usr/bin/docker stop -t 30 vllm-extract
 Restart=always

@@ -8,11 +8,9 @@ RequiresMountsFor=/mnt/data
 Type=simple
 User=sagoyal
 WorkingDirectory=/mnt/data/src/muse-glimmer-dspark
-EnvironmentFile=-/mnt/data/runs/run.env
-Environment=DATA_ROOT=/mnt/data
-Environment=HF_HOME=/mnt/data/hf
-# The pipeline runs inside the same image as the server so torch, transformers
-# and vLLM are identical on both sides of the hidden-state transfer.
+# Same reason as vllm-extract: --env-file, never systemd Environment= with a
+# pass-through -e, because sudo resets the environment in between.
+ExecStartPre=-/usr/bin/sudo /usr/bin/docker rm -f dspark-train
 ExecStart=/usr/bin/sudo /usr/bin/docker run --rm --name dspark-train \
   --gpus all --network host --ipc host \
   -v /mnt/data:/mnt/data -v /dev/shm:/dev/shm \

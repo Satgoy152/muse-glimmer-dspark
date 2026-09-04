@@ -62,12 +62,35 @@ MAX_SAMPLES=50000
 SHARDS=32
 DATA_ROOT=/mnt/data
 HF_HOME=/mnt/data/hf
+SPECULATORS_DIR=/opt/speculators
+HIDDEN_STATES_PATH=/dev/shm/hidden_states
+RENDER_ENDPOINT=http://127.0.0.1:8000
+REPO=/mnt/data/src/muse-glimmer-dspark
+RUNS=/mnt/data/runs
 ENV
 
 sudo cp /mnt/data/src/muse-glimmer-dspark/deploy/*.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now vllm-extract dspark-pipeline
+sudo systemctl enable --now vllm-extract
+# dspark-pipeline is the go switch -- enabling it starts the full render.
+sudo systemctl enable --now dspark-pipeline
 ```
+
+Verified on the node: killing the container with SIGKILL is recovered without
+intervention.
+
+```
+20:48:09  vllm-extract.service: Main process exited, code=exited, status=1/FAILURE
+20:48:24  vllm-extract.service: Scheduled restart job, restart counter is at 6
+20:48:24  Started vllm-extract.service
+```
+
+Both units hand these to docker with `--env-file`, never with systemd
+`Environment=` plus a pass-through `-e VAR`. `ExecStart` runs under `sudo`,
+whose `env_reset` drops the unit's environment before docker sees it, so the
+pass-through form delivers empty values and the server comes up on
+`serve_extract.sh`'s own defaults — a 49,152 window and TP 4 on a one-GPU box,
+with nothing in the log to say so.
 
 Both units are `Restart=always` with `StartLimitIntervalSec=0`, and both are
 `WantedBy=multi-user.target`, so a preempted node that comes back resumes on its
