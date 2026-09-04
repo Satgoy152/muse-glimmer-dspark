@@ -1,0 +1,66 @@
+#!/bin/bash
+# Install mini-swe-agent inside a Terminal-Bench task container.
+#
+# Replaces Terminal-Bench's stock template, which runs `pip3 install
+# mini-swe-agent` against whatever Python the task image happens to ship. Task
+# images vary wildly and several are ancient: accelerate-maximal-square is
+# Ubuntu 18.04 / glibc 2.27, where the newest installable pip was 21.3.1 (the
+# last release supporting Python 3.6) and mini-swe-agent resolved to "no
+# matching distribution". The stock template has no error checking, so it still
+# printed INSTALL_SUCCESS and the run failed later as `mini: command not found`.
+#
+# Two separate problems, two fixes:
+#
+#   * Old Python -> uv fetches a standalone CPython, so the image's Python is
+#     irrelevant.
+#   * Old glibc -> the standalone Python still reports the host's platform tag,
+#     so manylinux_2_28 wheels are filtered out and uv falls back to building
+#     from source. tiktoken then fails for want of a Rust compiler. `--no-build`
+#     forbids source builds, which makes the resolver backtrack to versions that
+#     do ship compatible wheels (tiktoken 0.14.0 -> 0.11.0 on glibc 2.27).
+#
+# The harness sources this script, so the PATH export reaches the agent command
+# that runs after it.
+
+if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+  # 18.04 is EOL, so its archive host 404s; retry against old-releases.
+  apt-get update >/dev/null 2>&1 || {
+    sed -i 's|archive.ubuntu.com|old-releases.ubuntu.com|g; s|security.ubuntu.com|old-releases.ubuntu.com|g' \
+      /etc/apt/sources.list 2>/dev/null
+    apt-get update >/dev/null 2>&1
+  }
+  apt-get install -y curl ca-certificates >/dev/null 2>&1 || true
+fi
+
+export PATH="$HOME/.local/bin:$PATH"
+export UV_TOOL_BIN_DIR=/usr/local/bin
+if ! command -v uv >/dev/null 2>&1; then
+  if command -v curl >/dev/null 2>&1; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+  else
+    wget -qO- https://astral.sh/uv/install.sh | sh
+  fi
+fi
+
+{% if version %}
+uv tool install --python 3.12 --no-build "mini-swe-agent=={{ version }}"
+{% else %}
+uv tool install --python 3.12 --no-build mini-swe-agent
+{% endif %}
+
+# uv installed the executables into UV_TOOL_BIN_DIR. Do not symlink over them:
+# a `ln -sf $HOME/.local/bin/mini /usr/local/bin/mini` "fallback" replaces the
+# real binary with a dangling link whenever UV_TOOL_BIN_DIR is /usr/local/bin.
+# Just make sure the directory is on PATH for the agent command that follows.
+case ":$PATH:" in
+  *":$UV_TOOL_BIN_DIR:"*) ;;
+  *) export PATH="$UV_TOOL_BIN_DIR:$PATH" ;;
+esac
+
+# Only claim success if the binary actually runs. The stock template reported
+# success on a failed install, which is what hid the original error.
+if command -v mini >/dev/null 2>&1; then
+  echo "INSTALL_SUCCESS"
+else
+  echo "mini not on PATH after install" >&2
+fi
