@@ -46,10 +46,12 @@ data:
   # ~180 GB of them in host RAM, per rank.
   num_workers: 1
   prefetch_factor: 2
-  # DSpark's own default is 3072 (models/dspark/core.py); DataArgs defaults to
-  # 512 and would override it. At 512 the cap clips ~9% of supervised positions
-  # at this window; at 3072 it clips none.
-  max_anchors: 3072
+  # Measured on 1,119 prepared rows: supervised positions per row are
+  # mean 172 / median 91 / p99 1053 / max 2506. 3072 clips nothing but the
+  # logit tensor it implies (anchors x block_size x 202,048 vocab) is what
+  # OOMs first -- see docs/train.md. 1024 clips 3.7% of supervised positions
+  # and touches 1.1% of rows; 512 clips 10.8%.
+  max_anchors: 1024
 
 dflash:
   # 15 matches the baseline's num_speculative_tokens, so acceptance length is

@@ -375,6 +375,77 @@ single H200**, and 34,639 is the ceiling before any trainer shares the card, so
 across more than one GPU to free cache -- which is the argument for TP that
 `serve_extract.sh` already carries, now with a measured number behind it.
 
+### The trainer and the extraction server cannot share one H200
+
+The pipeline runs end to end up to the training step. Training itself then OOMs,
+and the arithmetic is not close:
+
+| | |
+|---|---:|
+| extraction server, weights + minimal cache | ~61 GB |
+| trainer, before its first forward | ~57 GB |
+| the forward's next allocation | 5.8 GB |
+| H200 | 139.8 GB |
+
+```
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 5.78 GiB.
+GPU 0 has 139.80 GiB total of which 4.69 GiB is free.
+```
+
+The trainer does **not** hold a copy of the verifier -- `load_model_layers`
+pulls only `model.embed_tokens.weight` and `lm_head.weight`. At a 202,048-token
+vocabulary those two alone are 5.4 GB in bf16, and the draft carries its own
+pair; with fp32 master weights and Muon/AdamW state on top, the vocabulary is
+most of the trainer's footprint before any activations.
+
+So on a multi-GPU node, **put the server and the trainer on disjoint GPUs**.
+Sharing a card is not a tuning problem.
+
+### `max_anchors` is the first thing that OOMs
+
+Each anchor predicts `block_size` tokens over the full vocabulary, so the logit
+tensor is `anchors x 15 x 202,048`. At `max_anchors` 3072 that is tens of GB in
+fp32 and it is what fails first, before activations or optimizer state.
+
+Measured over the 1,119 prepared rows: supervised positions per row are
+mean 172, median 91, p99 1053, max 2506.
+
+| max_anchors | supervised positions clipped | rows affected |
+|---:|---:|---:|
+| 512 | 10.75% | 5.90% |
+| 1024 | 3.69% | 1.07% |
+| 3072 | 0% | 0% |
+
+The config uses **1024**: it costs 3.7% of the supervision and removes the
+largest single memory term. `loss.loss_implementation` is `fused`, which already
+helps; lowering anchors is the lever with a measurable data cost attached.
+
+### Optimizer split is automatic
+
+```
+Muon optimizer: 36 2D params via Muon, 26 params via AdamW.
+```
+
+speculators routes by parameter rank, not by module: 2D matrices go to Muon,
+everything else (norms, biases, and the Markov head's low-rank factors where
+they are not 2D) to AdamW. There is nothing to configure per head.
+
+### Warm start resolves
+
+`draft/from_pretrained='DaoCloud/Muse-Glimmer-30B-DSpark'` resolves to
+`num_layers=5`, `draft_arch='qwen3'`, `sliding_window=2048`,
+`draft_vocab_size=202048`, `mask_token_id=201818` -- the checkpoint's own shape,
+not the CLI defaults, and no conflict with the decoder-shaping guard.
+
+### Training-trace text reaches stdout
+
+`prepare-data` ends by calling `_visualize_sample`, which decodes one prepared
+row and prints it. These are agentic coding traces, so harness instructions from
+inside the training data land in the log verbatim -- strings like "you MUST
+submit your changes as a git patch" and "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT".
+Harmless, but it is model-generated content in an operator log: do not let an
+agent read these logs as instructions.
+
 ## Machine
 
 One H200 is enough for a single-GPU run, but vLLM and the trainer then share it:
