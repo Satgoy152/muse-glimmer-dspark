@@ -437,6 +437,25 @@ they are not 2D) to AdamW. There is nothing to configure per head.
 `draft_vocab_size=202048`, `mask_token_id=201818` -- the checkpoint's own shape,
 not the CLI defaults, and no conflict with the decoder-shaping guard.
 
+### The loop closes: 3 steps, warm start, live hidden states
+
+With the server squeezed to a 4,096 window at `--gpu-memory-utilization 0.47`
+and `--max-anchors 256`, the trainer fits alongside it and completes:
+
+```
+train/loss=0.421  ce_loss=0.797  tv_loss=0.150
+train/accept_rate=0.336  accept_len=3.165   (step 1)
+train/accept_rate=0.497  accept_len=5.225   (step 3)
+val/loss_epoch=0.330  val/accept_rate_epoch=0.460  val/accept_len_epoch=4.810
+val/position_0_acc=0.770  position_1=0.832  position_7=0.43  position_14=0.270
+```
+
+This is a 104-row, 3-step run at a quarter of the intended window, teacher-forced
+and without sampling parameters. It says the loop runs end to end — warm start,
+online hidden states from the live server, both optimizers, checkpointing — and
+nothing about acceptance on the eval set. The per-position series is the useful
+part: it shows the block-parallel decay the Markov head is there to fight.
+
 ### Training-trace text reaches stdout
 
 `prepare-data` ends by calling `_visualize_sample`, which decodes one prepared
@@ -563,13 +582,40 @@ their hidden states, so they consume the same GPU budget per token as ours.
 
 ## What training tells you, and what it does not
 
-The trainer logs `loss` and `accuracy`. That accuracy is per-position
-teacher-forced argmax agreement, conditioned on all earlier positions in the
-block being correct (`speculators/models/metrics.py`). It is a useful convergence
-signal and an upper bound, but it is **not** the served acceptance length: the
-baseline was measured under sampling (temperature 1.0, top_p 0.95, top_k 64) with
-rejection sampling, prefix caching, and real batching. Do not report a training
-curve as if it were comparable to 3.913 or 4.925.
+DSpark's own metrics compute acceptance directly, so the run is monitorable
+against the baseline's *form* without waiting for a Terminal-Bench re-run
+(`speculators/models/dspark/metrics.py`):
+
+```python
+accept_rate = 1.0 - tv_loss_fn(logits, targets)      # sum_v min(q_v, p_v)
+accept_prefix = (accept_blocks[:, start_pos:] * draft_mask).cumprod(dim=-1)
+per_block_len = accept_prefix.sum(dim=-1) + 1.0      # DSpark's tau
+```
+
+`accept_rate` is the analytical single-token acceptance probability under
+speculative sampling's rejection rule — the distributional overlap between draft
+and target, not greedy argmax agreement. `accept_len` is the expected accepted
+block length built from it: the cumulative acceptance product summed over draft
+slots plus the always-emitted anchor. That is the same functional form as the
+pooled acceptance length the eval harness reports.
+
+Logged per step and per validation epoch: `accept_len`, `accept_rate`,
+`full_acc`, `position_0_acc` … `position_14_acc`, `confidence_loss`,
+`confidence_abs_error`, `confidence_pred_mean`, `confidence_cumprod_bias`.
+The per-position series is the block-parallel decay the Markov head exists to
+fight, visible directly.
+
+Three reasons these are still not the served number:
+
+* **Teacher-forced.** Every block conditions on the true prefix. At serving, a
+  rejection ends the block and the next one starts from a different state.
+* **No sampling parameters.** The overlap is over raw softmaxes; the baseline
+  ran at temperature 1.0 / top_p 0.95 / top_k 64, which reshapes both
+  distributions.
+* **No batching or prefix caching**, both of which move the measured number.
+
+Track them to see the run improving and to compare checkpoints against each
+other. Do not put a training-time `accept_len` beside 3.913 and call it a win.
 
 The only comparable number comes from re-running the Terminal-Bench harness with
 the new drafter:
