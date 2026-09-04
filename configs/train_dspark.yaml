@@ -33,18 +33,21 @@ data:
   data_path: runs/dspark/data
   # MUST equal prepare-data --seq-length. See docs/train.md: the window decides
   # how much of the workload survives, and a mismatch here silently re-clips.
-  total_seq_len: 16384
+  # 32,768 covers 75.5% of the decoded tokens on the Terminal-Bench eval set,
+  # against 44.4% at 16,384. Pair it with --max-samples 50000 so the row count,
+  # not the window, sets the extraction budget.
+  total_seq_len: 32768
   train_data_ratio: 0.99
   hidden_states_backend: file
   hidden_states_dtype: bfloat16
-  # 6 layers x 6656 x 2 B = ~78 KB per token, so a 16,384-token row carries
-  # ~1.3 GB of hidden states. The stock 12 workers x 4 prefetch would hold ~60 GB
-  # of them in host RAM.
-  num_workers: 2
+  # 6 layers x 6656 x 2 B = ~78 KB per token, so a 32,768-token row carries
+  # ~2.6 GB of hidden states. The stock 12 workers x 4 prefetch would hold
+  # ~120 GB of them in host RAM, per rank.
+  num_workers: 1
   prefetch_factor: 2
   # DSpark's own default is 3072 (models/dspark/core.py); DataArgs defaults to
-  # 512 and would override it. At 512 the cap clips 5.5% of supervised positions
-  # at seq_length 16,384; at 3072 it clips none.
+  # 512 and would override it. At 512 the cap clips 8.2% of supervised positions
+  # at seq_length 32,768; at 3072 it clips none.
   max_anchors: 3072
 
 dflash:

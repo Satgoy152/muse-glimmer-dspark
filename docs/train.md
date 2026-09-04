@@ -35,25 +35,59 @@ below the workload: the Python API `build_speculator_training_dataset` defaults
 Measured from the `raw` config's recorded `prompt_tokens`, one row per call
 (`scripts/plan_seq_length.py`):
 
-| seq_length | turns kept | % turns | supervised tokens | % of all | prefill tokens | H200-h¹ |
-|---:|---:|---:|---:|---:|---:|---:|
-| 2,048 | 2,244 | 1.4% | 242,227 | 0.9% | 4.0M | 0 |
-| 8,192 | 25,454 | 15.9% | 2,722,734 | 9.6% | 128M | 5 |
-| 16,384 | 61,518 | 38.5% | 8,483,732 | 29.9% | 577M | 24 |
-| 24,576 | 95,642 | 59.9% | 14,985,332 | 52.8% | 1.28B | 54 |
-| 32,768 | 124,835 | 78.2% | 20,817,222 | 73.3% | 2.12B | 89 |
-| 49,152 | 155,172 | 97.2% | 27,239,319 | 95.9% | 3.31B | 139 |
+| seq_length | turns kept | % turns | supervised positions | prefill tokens |
+|---:|---:|---:|---:|---:|
+| 2,048 | 2,244 | 1.4% | 242,227 | 4.0M |
+| 8,192 | 25,454 | 15.9% | 2,722,734 | 128M |
+| 16,384 | 61,518 | 38.5% | 8,483,732 | 577M |
+| 32,768 | 124,835 | 78.2% | 20,817,222 | 2.12B |
+| 49,152 | 155,172 | 97.2% | 27,239,319 | 3.31B |
 
-¹ one full extraction pass at an assumed 6,600 prefill tok/s. **Measure the real
-rate on the box and re-run `scripts/plan_seq_length.py --tok-per-s`** before
-committing to a row budget; the whole right-hand side scales with it.
+### Choosing it against the eval distribution, not the training set
 
-The config uses **16,384**. Rationale: within a fixed GPU-hour budget it yields
-the most supervision, because context grows much faster than the assistant turn
-it supervises (mean 22,132 tokens of context per 178 supervised tokens), so a
-larger window buys coverage at a worse rate. 8,192 is cheaper per row still, but
-holds only the first ~16% of turns and cuts exactly the long-context regime this
-project exists to improve. Raise it if the budget allows; log the value used.
+The window has to be judged against where Terminal-Bench actually decodes, and
+the two sets are close enough that the training data is representative:
+
+| | SWE-Gym (train) | Terminal-Bench (eval) |
+|---|---:|---:|
+| calls | 159,724 | 1,755 |
+| context, median | 20,663 | 20,282 |
+| context, mean | 22,132 | 24,108 |
+| context, p99 | 55,420 | 82,321 |
+| output tokens, mean | 178 | 296 |
+
+Share of **decoded** tokens emitted at a context inside the window — the number
+that matters, since acceptance is measured per generated token:
+
+| seq_length | SWE-Gym decode covered | TB decode covered |
+|---:|---:|---:|
+| 8,192 | 9.9% | 22.8% |
+| 16,384 | 30.4% | 44.4% |
+| 32,768 | 73.8% | 75.5% |
+| 49,152 | 96.1% | 92.4% |
+
+Window and row budget are separate levers. `--max-samples` trims after fan-out
+and shuffling, so a large window with a row cap yields a uniform sample over the
+*whole* context range, rather than every row from its bottom slice:
+
+| plan | rows | supervised positions | prefill | TB decode covered |
+|---|---:|---:|---:|---:|
+| 16,384, no cap | 61,518 | 8.5M | 577M | 44.4% |
+| 32,768, cap 50,000 | 50,000 | 8.3M | 848M | 75.5% |
+| 49,152, cap 50,000 | 50,000 | 8.8M | 1.07B | 92.4% |
+
+The configured plan is **32,768 with `--max-samples 50000`**: the same
+supervision volume as filling a 16,384 window, at 1.5x the extraction cost, for
+70% more of the eval's decoding in distribution. 49,152 buys another 17 points
+for 26% more cost and is the better run if the smoke test shows the memory
+headroom — a row's hidden states are ~3.8 GB there against ~2.6 GB at 32,768.
+
+What a short window does **not** break is the drafter's own context. All five
+DSpark decoder layers are `sliding_attention` with `sliding_window: 2048`, so
+the draft never attends beyond 2,048 tokens whatever the row length, and
+`position_ids` are a plain `arange` per row, compared only within that window.
+The exposure is distribution shift in the *target's* hidden states at deep
+context, not positional extrapolation.
 
 Three separate knobs must agree: `prepare-data --seq-length`,
 `data.total_seq_len` in the train config, and `--max-model-len` on the
@@ -239,20 +273,24 @@ only.
 
 ## Scale
 
-At `seq_length` 16,384, over the 1,981 trajectories:
+Three different quantities get called "tokens" here; keep them apart.
 
 | | |
 |---|---:|
-| training rows (one per assistant turn that fits) | 61,518 |
-| supervised positions (`loss_mask` = 1) | 8,483,732 |
-| anchors kept at `max_anchors` 3072 | 8,482,598 |
-| next-token targets at `block_size` 15 | ~121M |
+| assistant tokens the model actually generated, whole dataset | 28.4M |
+| ... of those, inside a 32,768 window | 20.8M |
+| ... in a 50,000-row sample of that window | 8.3M |
+| **distinct supervised positions trained on** | **8.3M** |
+| loss terms, at `block_size` 15 | ~119M |
 
-Every supervised position is an anchor, and every anchor predicts the next 15
-tokens, so the target count is ~15x the supervised positions less the tail: the
-last 14 anchors of a turn run past its end and lose targets. `max_anchors` is
-set to 3072 because DSpark's own default is 3072 while `DataArgs` defaults to
-512, and 512 would clip 5.5% of positions.
+The last row is not more data. Each anchor predicts the next 15 tokens, so every
+token is a target 15 times over, once from each of the 15 anchors that precede
+it. The count of independent things being learned from is the 8.3M positions;
+the 119M is the number of loss terms computed over them.
+
+`max_anchors` is set to 3072 because DSpark's own default is 3072 while
+`DataArgs` defaults to 512, and 512 would clip 8.2% of positions at this
+window.
 
 ## Replay
 
