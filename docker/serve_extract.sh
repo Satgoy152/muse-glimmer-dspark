@@ -22,7 +22,7 @@ MODEL="${MODEL:-meta-models/Muse-Glimmer-30B}"
 PORT="${PORT:-8000}"
 # Must match configs/train_dspark.yaml data.total_seq_len and prepare-data
 # --seq-length. +1 covers the single decoded token of the max_tokens=1 request.
-SEQ_LENGTH="${SEQ_LENGTH:-32768}"
+SEQ_LENGTH="${SEQ_LENGTH:-49152}"
 HIDDEN_STATES_PATH="${HIDDEN_STATES_PATH:-/data/hidden_states}"
 SPECULATORS_DIR="${SPECULATORS_DIR:-/data/speculators}"
 

@@ -76,18 +76,78 @@ and shuffling, so a large window with a row cap yields a uniform sample over the
 | 32,768, cap 50,000 | 50,000 | 8.3M | 848M | 75.5% |
 | 49,152, cap 50,000 | 50,000 | 8.8M | 1.07B | 92.4% |
 
-The configured plan is **32,768 with `--max-samples 50000`**: the same
-supervision volume as filling a 16,384 window, at 1.5x the extraction cost, for
-70% more of the eval's decoding in distribution. 49,152 buys another 17 points
-for 26% more cost and is the better run if the smoke test shows the memory
-headroom — a row's hidden states are ~3.8 GB there against ~2.6 GB at 32,768.
+Widening past 32,768 is unusually cheap here, because contexts that deep are
+rare: almost all of the extra prefill is already paid by 49,152, and 65,536
+costs only 4% more than that while closing nearly the whole gap.
 
-What a short window does **not** break is the drafter's own context. All five
-DSpark decoder layers are `sliding_attention` with `sliding_window: 2048`, so
-the draft never attends beyond 2,048 tokens whatever the row length, and
-`position_ids` are a plain `arange` per row, compared only within that window.
-The exposure is distribution shift in the *target's* hidden states at deep
-context, not positional extrapolation.
+| plan | rows | sup positions | prefill | h @20k tok/s | TB decode covered | hidden states/row |
+|---|---:|---:|---:|---:|---:|---:|
+| 32,768, cap 50,000 | 50,000 | 8.3M | 848M | 11.8 | 75.5% | 2.6 GB |
+| 49,152, cap 50,000 | 50,000 | 8.8M | 1.07B | 14.8 | 92.4% | 3.9 GB |
+| 65,536, cap 50,000 | 50,000 | 8.9M | 1.11B | 15.4 | 98.0% | 5.2 GB |
+
+The config is set to **49,152 with `--max-samples 50000`**. Try 65,536 first in
+the smoke test and drop down this ladder only if it does not fit: per-row hidden
+states reach 5.2 GB there, and the logit tensor over a 202,048 vocab at 3,072
+anchors x 15 positions is large independent of the window (see
+`loss.loss_implementation` for chunking).
+
+At 49,152 a uniform row sample already lands close to the eval's decode-weighted
+context profile, so no stratified sampling is needed:
+
+| context | train rows | eval decode |
+|---|---:|---:|
+| <4k | 6.2% | 11.5% |
+| 4–8k | 10.2% | 11.2% |
+| 8–16k | 23.2% | 21.6% |
+| 16–24k | 22.0% | 16.5% |
+| 24–32k | 18.8% | 14.6% |
+| 32–48k | 19.6% | 16.9% |
+| 48k+ | 0.0% | 7.6% |
+
+The one real gap is the last row, and it is the reason to prefer 65,536.
+
+### Why the drafter's own sliding window does not make this safe
+
+All five DSpark decoder layers are `sliding_attention` at `sliding_window: 2048`,
+and `position_ids` are a plain `arange` per row, compared only inside that
+window. That rules out *positional* extrapolation — the draft never sees an
+unfamiliar relative offset at 85k. It does not rule out the window mattering,
+because the draft's input is not raw tokens. It is the target's hidden states,
+and the target is a hybrid:
+
+```
+layer_types  = [sliding, sliding, sliding, full] x 13   (52 layers)
+full attention at 3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51
+layer_rope_theta == 0 at exactly those indices -> the global layers are NoPE
+```
+
+Against the five aux capture points, plus the final hidden state:
+
+| aux layer | own type | full-attention layers below it |
+|---:|---|---:|
+| 2 | sliding | 0 |
+| 14 | sliding | 3 |
+| 26 | sliding | 6 |
+| 38 | sliding | 9 |
+| 50 | sliding | 12 |
+| 52 (final) | — | 13 |
+
+Only layer 2 is context-local. Everything from layer 14 up has already mixed
+through several unbounded-attention layers, so the hidden states the drafter
+consumes encode the entire prompt, not the last 2,048 tokens. A state taken at
+position 60,000 of an 85,000-token trajectory is genuinely a different input
+distribution from anything a 16,384-token row contains — and because the global
+layers are NoPE, their attention is pure content matching whose mass spreads as
+the prompt grows, so the shift is a function of prompt length directly.
+
+The token sequence inside the draft's own 2,048-token window is also not
+independent of this: those tokens were themselves generated conditioned on the
+full context, so the local distribution the draft models carries long-range
+structure even where it cannot attend to it.
+
+Train at a window that covers where the eval actually decodes. The drafter's
+sliding window bounds its positional exposure and nothing else.
 
 Three separate knobs must agree: `prepare-data --seq-length`,
 `data.total_seq_len` in the train config, and `--max-model-len` on the
