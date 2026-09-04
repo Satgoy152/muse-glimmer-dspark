@@ -216,9 +216,27 @@ there explicitly, or the `kv_connector` name will not resolve.
 
 Two vLLM constraints follow from the above:
 
-- **Chunked prefill must be off.** Upstream states it is incompatible with the
-  feature, so a prefill arrives as one batch and `--max-num-batched-tokens` must
-  be at least `--max-model-len`.
+- **Chunked prefill must be off, and vLLM will not do it for you.**
+  `enable_chunked_prefill` defaults to `True` and nothing in the config layer
+  ties it to `extract_hidden_states` — the only automatic disable is for
+  encoder-decoder models. The flag is ours to set.
+
+  The reason: hidden states are written into the cache by the *proposer*
+  (`ExtractHiddenStatesProposer.propose`), which runs on the post-sampling
+  drafting path. A request mid-way through a chunked prefill has not sampled
+  anything that step, so its chunk never reaches `propose()` and those tokens'
+  slots are never written. At `request_finished` the connector reads
+  `len(prompt_token_ids)` slots straight out of the block list regardless, so
+  the extracted tensor still has the right shape and the right `token_ids` —
+  only the values for every chunk but the last are stale cache memory.
+  `check_hidden_states` compares shapes and token ids and scans for non-finite
+  values, none of which catches uninitialised memory. This one fails silently.
+
+  Because chunked prefill is off, `--max-num-batched-tokens` must be at least
+  `--max-model-len`; `SchedulerConfig.verify_max_model_len` raises otherwise.
+  That in turn sizes a permanent GPU buffer in the proposer of
+  `(max_num_batched_tokens + max_num_seqs) x 6 layers x 6656 x bf16` — about
+  3.9 GB at a 49,152 window.
 - **Prefix caching is unverified here.** Hidden states live in a KV cache group,
   so in principle a cache hit retains them, and turns within one trajectory
   share nearly all their context -- the upside is roughly an order of magnitude
@@ -264,10 +282,15 @@ What each step is actually testing, in the order it fails:
    carry an extra `messages` column. `train/data.py` only forwards `messages`
    to the hidden-state request when a message's content is a *list*, which ours
    never is, so this should stay on the token-id path. Confirm it does.
-4. **The warm start loads.** `DaoCloud/Muse-Glimmer-30B-DSpark` reports
+4. **`get_hidden_size()` returns 6656, not 6144.** The proposer sizes its
+   buffer from `model_config.get_hidden_size()`. Muse Glimmer's config carries
+   `out_hidden_size: 6144` at the top level and `text_config.hidden_size: 6656`;
+   if the former wins, the extracted states are the wrong width for a draft
+   built on 6656. Check the shape in the first safetensors file.
+5. **The warm start loads.** `DaoCloud/Muse-Glimmer-30B-DSpark` reports
    `speculators_version: "0+source"`. If `--draft.from-pretrained` rejects it,
    fall back to a scratch init with that config's shape and raise `lr` to 1e-4.
-5. **Steps run and loss moves.**
+6. **Steps run and loss moves.**
 
 Then repeat step 3 with `PREFIX_CACHING=on` and compare wall-clock. That answers
 the TP-vs-DP question for the real run.
