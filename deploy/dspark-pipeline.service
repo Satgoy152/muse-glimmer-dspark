@@ -3,6 +3,15 @@ Description=DSpark speculator training pipeline (resumable)
 After=vllm-extract.service
 Wants=vllm-extract.service
 RequiresMountsFor=/mnt/data
+# StartLimit* are [Unit] directives -- systemd logs "Unknown key name
+# 'StartLimitIntervalSec' in section 'Service', ignoring" and silently keeps the
+# 10s default if they are put under [Service]. With RestartSec longer than that
+# window the counter never accumulates, so Restart=always loops forever on a
+# configuration error, reloading 60 GB of weights each time. One hour and ten
+# starts is far beyond any legitimate slow boot but stops a crash loop, leaving
+# the cause visible in `systemctl status`.
+StartLimitIntervalSec=3600
+StartLimitBurst=10
 
 [Service]
 Type=simple
@@ -22,7 +31,6 @@ ExecStop=/usr/bin/sudo /usr/bin/docker stop -t 60 dspark-train
 # endpoint is still reloading after a shared preemption.
 Restart=always
 RestartSec=60
-StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target

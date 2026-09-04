@@ -5,6 +5,15 @@ Requires=docker.service
 # The whole run lives on /mnt/data; starting without it would rebuild state on
 # the ephemeral root disk and lose it at the next preemption.
 RequiresMountsFor=/mnt/data
+# StartLimit* are [Unit] directives -- systemd logs "Unknown key name
+# 'StartLimitIntervalSec' in section 'Service', ignoring" and silently keeps the
+# 10s default if they are put under [Service]. With RestartSec longer than that
+# window the counter never accumulates, so Restart=always loops forever on a
+# configuration error, reloading 60 GB of weights each time. One hour and ten
+# starts is far beyond any legitimate slow boot but stops a crash loop, leaving
+# the cause visible in `systemctl status`.
+StartLimitIntervalSec=3600
+StartLimitBurst=10
 
 [Service]
 Type=simple
@@ -24,9 +33,6 @@ ExecStart=/usr/bin/sudo /usr/bin/docker run --rm --name vllm-extract \
 ExecStop=/usr/bin/sudo /usr/bin/docker stop -t 30 vllm-extract
 Restart=always
 RestartSec=15
-# A cold start reloads 60 GB of weights and re-runs torch.compile; do not let
-# systemd give up on a node that is simply slow to come back.
-StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target
