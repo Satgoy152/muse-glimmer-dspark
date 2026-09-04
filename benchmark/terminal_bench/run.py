@@ -37,6 +37,9 @@ from concurrent.futures import ThreadPoolExecutor
 import urllib.request
 from pathlib import Path
 
+# tb_agent and mini-swe-setup.sh.j2 live beside this file
+HERE = Path(__file__).resolve().parent
+
 SEGMENTS = ["low", "medium", "high", "xhigh"]
 
 
@@ -151,7 +154,7 @@ class Watchdog(threading.Thread):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--manifest", default="data/benchmark/terminal_bench_frozen40.json")
+    p.add_argument("--manifest", default=str(HERE / "tasks_frozen40.json"))
     p.add_argument("--dataset-path", default="/data/terminal-bench-1/original-tasks")
     p.add_argument("--runs", default="/data/runs")
     p.add_argument("--model", default="openai/meta-models/Muse-Glimmer-30B")
@@ -210,7 +213,7 @@ def main():
         # Per-segment copy: TB_REASONING_STRENGTH must not be shared mutable
         # state when segments run concurrently.
         env = dict(os.environ)
-        env["PYTHONPATH"] = str(Path("scripts").resolve())
+        env["PYTHONPATH"] = str(HERE)
         env["TB_REASONING_STRENGTH"] = seg
 
         t0 = time.time()

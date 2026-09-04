@@ -2,7 +2,7 @@
 
 All manifests and dataset files are frozen by `SEED = 20260830` and included directly in the repository.
 
-## Benchmark — `data/benchmark/terminal_bench_frozen40.json`
+## Benchmark — `benchmark/terminal_bench/tasks_frozen40.json`
 
 40 of 241 Terminal-Bench tasks, pinned to tree `d28711d0` of `harbor-framework/terminal-bench-1`
 (the `laude-institute/terminal-bench` URL now redirects there).
@@ -14,18 +14,25 @@ All manifests and dataset files are frozen by `SEED = 20260830` and included dir
 - 240/241 tasks carry the Terminal-Bench canary string. Any generated trace containing that GUID
   is a leak and must be dropped.
 
-The 40 frozen tasks are tracked directly in `data/benchmark/terminal_bench_frozen40.json`.
+The 40 frozen tasks are tracked directly in `benchmark/terminal_bench/tasks_frozen40.json`.
 
 ## Training — `data/training/train_instances.jsonl`
 
-2000 instances for trace generation, from 1106 repos.
+2000 instances for trace generation, all from SWE-Gym, across 11 repos.
 
 | Source | Instances | Repos | Role |
 |---|---|---|---|
-| SWE-Gym | 887 | 11 | large mature repos — long-horizon, deep-context trajectories |
-| SWE-bench-extra | 1113 | ~1100 | long tail — breadth |
+| SWE-Gym | 2000 | 11 | large mature repos — long-horizon, deep-context trajectories |
 
-- 111 duplicate `instance_id`s dropped.
+SWE-bench-extra was planned for the long tail (~1100 repos) and dropped: it publishes no
+pre-built images, and every instance here is verified against one. The manifest is 100%
+`SWE-Gym/SWE-Gym`; check it with `jq -r .source data/training/train_instances.jsonl | sort -u`
+before repeating the earlier claim of a two-source mix.
+
+- 111 duplicate `instance_id`s dropped. Duplicate problem *statements* were not: 2000
+  instances carry only 1981 distinct statements, and the recording proxy keys trajectories on
+  `sha1(first_user_message)`, so 18 statements shared by 2 instances collapse to one id.
+  The published dataset is 1981 trajectories, not 2000.
 - Leakage exclusion: every repo referenced by *any* of the 241 Terminal-Bench tasks (9 repos), not
   just the frozen 40.
 
@@ -43,8 +50,11 @@ Recommendation: **push traces to a private HF dataset repo from the CPU generati
 - Size is not a problem: ~2000 trajectories at ~60k context is ~120M tokens, roughly 0.6 GB of
   `int32` `input_ids` plus a `uint8` `loss_mask`, with raw JSON in single-digit GB.
 
-Push tokenized shards as parquet, and the raw request/response JSON as a second config in the same
-repo — the raw side is needed for the leakage audit and for re-tokenizing without regenerating.
+Push the exported `messages` as parquet, and the raw request/response JSON as a second config in
+the same repo — the raw side is needed for the leakage audit and for re-rendering without
+regenerating. Do not pre-tokenize: speculators' `build_speculator_training_dataset()` accepts
+`messages` and renders them itself, so the chat template and the loss mask come from the same
+code path that trains, rather than being hand-rolled here and frozen into the data.
 
 Two things this does *not* cover:
 

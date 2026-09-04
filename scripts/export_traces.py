@@ -7,7 +7,7 @@ from pathlib import Path
 STRENGTH_SENTENCE = "Reasoning strength: {}."
 
 
-def load(path):
+def load(path, require_strength=False):
     trajectories = {}
     for line in open(path):
         r = json.loads(line)
@@ -20,6 +20,11 @@ def load(path):
         # list, so the last call already holds the whole history and nothing needs stitching
         if prev is None or len(msgs) > len(prev[0]):
             strength = (r["request"].get("chat_template_kwargs") or {}).get("reasoning_strength")
+            # Hand-sent connectivity probes carry no chat_template_kwargs and would
+            # otherwise export as their own trajectory at the chat template's default
+            # reasoning strength.
+            if require_strength and not strength:
+                continue
             trajectories[r["traj"]] = (msgs, r["request"].get("tools"),
                                        r["response"]["choices"][0]["message"], strength, r["traj"])
     return trajectories
@@ -48,10 +53,10 @@ def bake_strength(msgs, strength):
     return msgs
 
 
-def main(src, outdir):
+def main(src, outdir, require_strength=False):
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
-    trajectories = load(src)
+    trajectories = load(src, require_strength)
     # training wants the full conversation, so the final reply is appended; guidellm generates
     # that reply itself, so it gets the same messages without it
     with open(outdir / "train.jsonl", "w") as train, open(outdir / "guidellm.jsonl", "w") as bench:
@@ -69,4 +74,7 @@ def main(src, outdir):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    args = sys.argv[1:]
+    require = "--require-strength" in args
+    args = [a for a in args if not a.startswith("--")]
+    main(args[0], args[1], require)
