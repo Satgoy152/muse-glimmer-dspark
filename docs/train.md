@@ -75,6 +75,109 @@ all 1,981 trajectories at the template default of `high`, against a real mix of
 trajectory before writing, and `scripts/verify_prepared.py` decodes prepared
 rows and checks the rendered mix afterwards. Run both.
 
+## How the pieces fit
+
+Three processes, one node, one shared filesystem.
+
+```text
+  conversations.jsonl
+        |
+        v
+  speculators prepare-data ----HTTP /v1/chat/completions/render----> vLLM
+        |                                                             ^
+        v  Arrow: input_ids, loss_mask, seq_len                       |
+  runs/dspark/data                                                    |
+        |                                                             |
+        v                                                             |
+  torchrun -m speculators.train --on-missing generate ---------------->|
+        ^                          (POST /v1/completions, max_tokens=1)
+        |                                                             |
+        +-- hs_*.safetensors <--- /data/hidden_states <--- hs_connectors
+```
+
+`launch_vllm.py` is a thin wrapper. It converts `--target-layer-ids` into two
+ordinary vLLM flags and then `exec`s `vllm serve`:
+
+```json
+--speculative_config {"method": "extract_hidden_states", "num_speculative_tokens": 1,
+    "draft_model_config": {"hf_config": {"eagle_aux_hidden_state_layer_ids": [2,14,26,38,50,52]}}}
+--kv_transfer_config  {"kv_connector": "ExampleHiddenStatesConnector",
+    "kv_connector_extra_config": {"hidden_states_path": "/data/hidden_states"}}
+```
+
+`extract_hidden_states` is not real speculation. It writes each requested
+layer's hidden states into a dedicated KV cache group (`HiddenStateCacheSpec`)
+and returns the sampled token as its own "draft" so verification always passes.
+The connector serialises that cache group to a safetensors file and hands the
+path back in the response's `kv_transfer_params["hidden_states_path"]`. The
+trainer reads the file off the shared filesystem and deletes it.
+
+So the trainer is given two things: `generation.vllm_endpoint` (where to ask)
+and `data.data_path` (the prepared rows). It does not stream hidden states over
+HTTP -- only the path travels over HTTP.
+
+`hs_connectors` is a separate distribution that `pip install speculators` pulls
+in as a dependency. The vLLM container does **not** get it that way: install it
+there explicitly, or the `kv_connector` name will not resolve.
+
+Two vLLM constraints follow from the above:
+
+- **Chunked prefill must be off.** Upstream states it is incompatible with the
+  feature, so a prefill arrives as one batch and `--max-num-batched-tokens` must
+  be at least `--max-model-len`.
+- **Prefix caching is unverified here.** Hidden states live in a KV cache group,
+  so in principle a cache hit retains them, and turns within one trajectory
+  share nearly all their context -- the upside is roughly an order of magnitude
+  on extraction cost. The upstream large-model example disables it and gives no
+  reason. Measure it (see below) rather than assuming either way. Note that
+  `prepare-data` shuffles rows before writing, so even a working prefix cache
+  buys nothing unless extraction visits a trajectory's turns together.
+
+## Smoke test on one GPU, before the 8x node
+
+Everything except throughput can be falsified on a single 180 GB card. The 30B
+is ~60 GB in BF16, so vLLM and the trainer fit side by side at a small window.
+
+```bash
+head -40 /data/train/conversations.jsonl > /data/train/smoke.jsonl
+
+SEQ_LENGTH=8192 TP=1 GPU_MEM_UTIL=0.55 MAX_NUM_SEQS=8   HIDDEN_STATES_PATH=/data/hidden_states bash docker/serve_extract.sh
+
+speculators prepare-data --model meta-models/Muse-Glimmer-30B \
+  --data /data/train/smoke.jsonl --output /data/runs/smoke/data \
+  --seq-length 8192 --minimum-valid-tokens 16 \
+  --render-endpoint http://127.0.0.1:8000
+
+uv run python scripts/verify_prepared.py --data /data/runs/smoke/data \
+  --model meta-models/Muse-Glimmer-30B --sample 50
+
+torchrun --standalone --nproc-per-node 1 -m speculators.train \
+  --config configs/train_dspark.yaml --print-config \
+  --data-path /data/runs/smoke/data --total-seq-len 8192 --max-steps 20
+```
+
+What each step is actually testing, in the order it fails:
+
+1. **The extraction server starts against a `ForConditionalGeneration` target.**
+   Muse Glimmer is multimodal; the aux-layer capture has to find the inner
+   language model. This is the same class of defect as the DSpark serving patch.
+2. **Render works and the mask is sane.** `prepare-data` visualises row 0 with
+   trainable tokens highlighted; `verify_prepared.py` checks the strength mix.
+3. **Hidden states match the stored `input_ids`.** `check_hidden_states` raises
+   `Token ids don't match expected token ids` on any re-render mismatch. The
+   target ships `processor_config.json`, so `AutoProcessor` returns a
+   `ProcessorMixin` and speculators takes its multimodal path -- prepared rows
+   carry an extra `messages` column. `train/data.py` only forwards `messages`
+   to the hidden-state request when a message's content is a *list*, which ours
+   never is, so this should stay on the token-id path. Confirm it does.
+4. **The warm start loads.** `DaoCloud/Muse-Glimmer-30B-DSpark` reports
+   `speculators_version: "0+source"`. If `--draft.from-pretrained` rejects it,
+   fall back to a scratch init with that config's shape and raise `lr` to 1e-4.
+5. **Steps run and loss moves.**
+
+Then repeat step 3 with `PREFIX_CACHING=on` and compare wall-clock. That answers
+the TP-vs-DP question for the real run.
+
 ## Machine
 
 One H200 is enough for a single-GPU run, but vLLM and the trainer then share it:
@@ -133,6 +236,58 @@ cost, not preprocessing time.
 Keep the resolved `--print-config` output next to the checkpoints. Checkpoints
 go to the persistent volume at `checkpoint_freq: 0.1`; mirror to HF at the end
 only.
+
+## Scale
+
+At `seq_length` 16,384, over the 1,981 trajectories:
+
+| | |
+|---|---:|
+| training rows (one per assistant turn that fits) | 61,518 |
+| supervised positions (`loss_mask` = 1) | 8,483,732 |
+| anchors kept at `max_anchors` 3072 | 8,482,598 |
+| next-token targets at `block_size` 15 | ~121M |
+
+Every supervised position is an anchor, and every anchor predicts the next 15
+tokens, so the target count is ~15x the supervised positions less the tail: the
+last 14 anchors of a turn run past its end and lose targets. `max_anchors` is
+set to 3072 because DSpark's own default is 3072 while `DataArgs` defaults to
+512, and 512 would clip 5.5% of positions.
+
+## Replay
+
+The community DSpark was trained on general chat, and this fine-tune can wash
+that out. `DaoCloud/Muse-Glimmer-OPB-100K` (148,900 rows) is the replay set.
+
+It is **pre-tokenized** -- `input_ids` and `loss_mask` -- so it takes
+`_passthrough_pretokenized` and needs no render endpoint. `--data` is
+repeatable and the pretokenized check is per input path, so one command handles
+both:
+
+```bash
+speculators prepare-data --model meta-models/Muse-Glimmer-30B \
+  --data /data/train/conversations.jsonl \
+  --data /data/train/opb_replay.jsonl \
+  --seq-length 16384 --minimum-valid-tokens 16 \
+  --render-endpoint http://127.0.0.1:8000 --output runs/dspark/data
+```
+
+Two things to get right:
+
+- **Ratio is set by what goes in, not by a flag.** The two sets are concatenated
+  and shuffled, and `--max-samples` then trims the combined pool, so it
+  preserves whatever ratio it was handed. Slice the OPB side yourself. Start at
+  roughly 3:1 SWE-Gym:OPB by *supervised positions*, not by rows -- OPB rows are
+  short chat turns and ours are long agentic ones, so equal row counts are not
+  equal supervision.
+- **Reconcile on `reasoning_strength`.** OPB carries it as a column, but the
+  rows are already tokenized, so it cannot be re-rendered at another level -- it
+  can only be filtered. Match its mix to ours (596 medium / 594 high / 593 low /
+  198 xhigh by trajectory) by subsampling OPB per level, or the replay set will
+  shift the strength distribution the drafter sees.
+
+Replay is not free: pre-tokenized rows still need a full target forward pass for
+their hidden states, so they consume the same GPU budget per token as ours.
 
 ## What training tells you, and what it does not
 

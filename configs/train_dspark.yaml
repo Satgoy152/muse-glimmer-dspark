@@ -42,9 +42,10 @@ data:
   # of them in host RAM.
   num_workers: 2
   prefetch_factor: 2
-  # Supervised tokens per row are small here (median 93, mean 178 assistant
-  # tokens per turn), so 512 anchors is not the binding constraint.
-  max_anchors: 512
+  # DSpark's own default is 3072 (models/dspark/core.py); DataArgs defaults to
+  # 512 and would override it. At 512 the cap clips 5.5% of supervised positions
+  # at seq_length 16,384; at 3072 it clips none.
+  max_anchors: 3072
 
 dflash:
   # 15 matches the baseline's num_speculative_tokens, so acceptance length is
@@ -65,11 +66,16 @@ loss:
   loss_fn: '{"ce": 0.1, "tv": 0.9}'
 
 optimizer:
+  # muon drives the 2D backbone matrices; AdamW takes norms, biases, embeddings,
+  # lm_head, and -- by name -- markov_w1/markov_w2, so the Markov head is never
+  # orthogonalised (train/optimizers.py:_ADAMW_NAME_HINTS).
   optimizer: muon
-  # Lower than the 1e-4 the from-scratch examples use: this is a fine-tune of a
-  # converged drafter, and the risk is washing out the general-chat competence
-  # rather than failing to fit 1,981 trajectories.
+  # Both lower than the 1e-4 the from-scratch examples use: this is a fine-tune
+  # of a converged drafter. muon_lr must be set explicitly -- left unset it
+  # resolves to 10 * lr, which would put the backbone back above the
+  # from-scratch rate.
   lr: 5e-5
+  muon_lr: 1e-4
 
 scheduler:
   scheduler_type: cosine
