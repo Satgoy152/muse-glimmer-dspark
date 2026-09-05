@@ -33,6 +33,14 @@ Acceptance falls as reasoning strength rises, from 4.345 at `low` to 3.797 at
 `xhigh`. Per-segment numbers, caveats and coverage:
 [benchmark/terminal_bench/README.md](benchmark/terminal_bench/README.md).
 
+| strength | calls | out_tok | accept_len | draft_rate | tok/s |
+|---|---:|---:|---:|---:|---:|
+| low | 350 | 56,664 | 4.345 | 0.223 | 174.2 |
+| medium | 369 | 140,552 | 4.034 | 0.202 | 166.4 |
+| high | 333 | 132,342 | 3.796 | 0.186 | 155.4 |
+| xhigh | 701 | 190,344 | 3.797 | 0.186 | 134.2 |
+| **pooled** | **1753** | **519,902** | **3.913** | **0.194** | **151.1** |
+
 ## Gathering Traces
 
 - **Trace Generation Workflow:** See [docs/generate.md](docs/generate.md) for environment setup, container management, and running the recording proxy.
