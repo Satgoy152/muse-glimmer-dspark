@@ -1,23 +1,4 @@
 """Turn the published traces into the JSONL `speculators prepare-data` reads.
-
-Two things this exists for.
-
-1. The column is `conversations`, not `messages`. `_preprocess_batch` reads
-   `examples.get("conversations", [])`; handed a `messages` column it logs
-   "No conversations key found", returns zero rows, and the run proceeds.
-
-2. The reasoning strength lives in the system message and must stay there.
-   It was originally a request-level `chat_template_kwargs`, which nothing
-   downstream of `messages` can see: `_render_conversation_rows` never passes
-   `chat_template_kwargs` to the render endpoint even though the client
-   supports it. `export_traces.bake_strength` moved it into the system text,
-   where the chat template honours it (`{%- if 'reasoning strength' not in
-   (sys_text | lower) -%}`). Rewriting or dropping system messages here would
-   silently re-render every trace at the template default of "high".
-
-   This script never edits a system message; it asserts the sentence survives
-   exactly once per trajectory and refuses to write an unusable file.
-
     uv run python scripts/build_train_jsonl.py --out data/train/conversations.jsonl
 """
 

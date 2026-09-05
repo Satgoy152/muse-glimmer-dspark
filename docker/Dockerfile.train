@@ -1,11 +1,8 @@
 # vLLM nightly + speculators + hs_connectors, in one image.
 #
-# One image runs both halves of training: the extraction server
-# (scripts/launch_vllm.py, which imports hs_connectors) and the trainer
-# (torchrun -m speculators.train). Keeping them in the same image is what makes
-# the torch/transformers/vLLM versions provably identical on both sides -- a
-# separate trainer env is the usual way to end up with a torch that disagrees
-# with the CUDA driver the server is using.
+# One image runs both halves of training: 
+# 1. the extraction server (scripts/launch_vllm.py, which imports hs_connectors) 
+# 2. the trainer (torchrun -m speculators.train). 
 #
 # Install order matters:
 #   1. setuptools-git-versioning -- speculators' build backend needs it, and
