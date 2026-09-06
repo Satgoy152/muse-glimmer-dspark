@@ -41,10 +41,20 @@ data:
   train_data_ratio: 0.99
   hidden_states_backend: file
   hidden_states_dtype: bfloat16
+  # In-flight hidden-state requests = nproc-per-node x num_workers, and this is
+  # the throughput knob for the whole run: each worker holds exactly one
+  # outstanding request, and fetch dominates compute by ~10x at num_workers 1.
+  # Measured on 4 trainer ranks at a 32,768 window, 8 workers vs 1:
+  #   fetch_ms 14,100 -> 157   fetch_frac 0.913 -> 0.105   step_ms 15,400 -> ~2,400
+  # prefetch_factor is NOT a second lever -- a worker drains its queue serially,
+  # so it buys buffering depth, not concurrency, and the main process is never
+  # the one waiting here. Raise num_workers instead, and keep
+  # nproc x num_workers <= the server's --max-num-seqs.
+  #
   # 6 layers x 6656 x 2 B = ~78 KB per token, so a 49,152-token row carries
-  # ~3.9 GB of hidden states. The stock 12 workers x 4 prefetch would hold
-  # ~180 GB of them in host RAM, per rank.
-  num_workers: 1
+  # ~3.9 GB of hidden states. At 8 workers x 2 prefetch x 4 ranks that is
+  # ~130 GB of host RAM; the earlier value of 1 was sized for a 196 GB node.
+  num_workers: 8
   prefetch_factor: 2
   # Measured on 1,119 prepared rows: supervised positions per row are
   # mean 172 / median 91 / p99 1053 / max 2506. 3072 clips nothing but the
@@ -106,5 +116,11 @@ generation:
   max_retries: 5
 
 logging:
+  # Both: wandb is how a long run is watched from off the node, tensorboard
+  # writes to the volume and survives a wandb auth or network failure -- finding
+  # out at hour three that nothing was recorded is the failure to avoid.
+  # wandb also needs WANDB_RUN_ID and WANDB_RESUME=allow in the environment, or
+  # every preemption restart opens a new run and the curves come out in pieces.
+  logger: wandb,tensorboard
   run_name: dspark-swegym-2k
   log_dir: runs/dspark/logs

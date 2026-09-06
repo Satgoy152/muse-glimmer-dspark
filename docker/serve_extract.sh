@@ -19,6 +19,9 @@
 set -euo pipefail
 
 MODEL="${MODEL:-meta-models/Muse-Glimmer-30B}"
+# Bound to loopback below: the trainer and prepare-data both reach this over
+# 127.0.0.1, and an unauthenticated vLLM on a public port is an open H200. On
+# the bring-up node it was being scanned within two hours of coming up.
 PORT="${PORT:-8000}"
 # Must match configs/train_dspark.yaml data.total_seq_len and prepare-data
 # --seq-length. +1 covers the single decoded token of the max_tokens=1 request.
@@ -50,15 +53,34 @@ MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-$((SEQ_LENGTH + 1))}"
 #   assert self.page_size_padded >= self.unpadded_page_size_bytes
 # in kv_cache_interface.py during cudagraph memory profiling.
 #
-# block_size 128 lifts the attention page to 131,072 B, the first power of two
-# above 79,872, which is the smallest value that lets the alignment succeed. It
-# costs 39% padding waste inside the hidden-state cache.
-BLOCK_SIZE="${BLOCK_SIZE:-128}"
+# The attention page is per rank; the hidden-state page is not. Hidden states
+# are the full residual stream and every rank holds all of it, while TP shards
+# the attention KV -- and with only 2 KV heads, any TP > 1 gives
+# max(1, 2 // TP) = 1 head per rank and halves the attention page:
+#
+#   TP=1, block 128:  2 x 128 x 2 x 2 x 128 = 131,072 B  >= 79,872   ok
+#   TP=4, block 128:  2 x 128 x 1 x 2 x 128 =  65,536 B  <  79,872   assert
+#   TP=4, block 256:  2 x 128 x 1 x 2 x 256 = 131,072 B  >= 79,872   ok
+#
+# So the default here is 256, which is correct for TP 2, 4 and 8; 128 is only
+# enough at TP=1. Either way the hidden-state page pads to 131,072 B, wasting
+# 51,200 B (39.06%) per block, which is what makes the window ceiling as low as
+# it is. Measured on 4xH200 at TP=4: 63,908 tokens of KV cache at
+# --gpu-memory-utilization 0.92.
+BLOCK_SIZE="${BLOCK_SIZE:-256}"
 
-# Whether a prefix-cache hit still yields hidden states for the cached span is
-# unverified -- see docs/train.md. `off` is the safe default and what the
-# upstream large-model example uses; `on` is worth measuring, because turns in
-# one trajectory share almost all of their context.
+# Prefix caching is BROKEN for hidden-state extraction. Measured: two runs with
+# caching off produce bitwise-identical hidden states (max abs diff 0), while a
+# run with caching on differs from that baseline by max 348 / mean 0.134 over
+# the cached span. The mechanism is the chunked-prefill bug: hidden states are
+# written by ExtractHiddenStatesProposer.propose(), a cache hit does not
+# recompute the span, so propose() never runs over it -- yet request_finished
+# still reads len(prompt_token_ids) slots out of the block list. Shapes,
+# token ids and finiteness all check out; only the values are stale.
+#
+# Do not re-enable it, and do not reorder rows by trajectory to chase cache
+# hits. The upside was capped anyway: hidden-state serialisation scales with
+# total tokens regardless of hits, so the measured speed-up was only ~1.5x.
 PREFIX_CACHING="${PREFIX_CACHING:-off}"
 if [ "${PREFIX_CACHING}" = "on" ]; then
   PREFIX_ARGS=(--enable-prefix-caching)
@@ -82,6 +104,7 @@ exec python3 "${SPECULATORS_DIR}/scripts/launch_vllm.py" "${MODEL}" \
   --target-layer-ids ${TARGET_LAYER_IDS} \
   -- \
   --port "${PORT}" \
+  --host 127.0.0.1 \
   --max-model-len "$((SEQ_LENGTH + 1))" \
   --tensor-parallel-size "${TP}" \
   --gpu-memory-utilization "${GPU_MEM_UTIL:-0.90}" \

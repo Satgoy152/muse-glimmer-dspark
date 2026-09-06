@@ -12,6 +12,9 @@
 #
 # Stage 3 is the reason for sharding: prepare-data has no partial progress, so
 # without shards a preemption at 90% costs the whole render.
+#
+# Runs inside specd:latest, which already carries datasets/pandas/pyarrow, so
+# the stages call python3 directly -- there is no .venv on the mounted repo.
 set -uo pipefail
 
 DATA_ROOT="${DATA_ROOT:-/mnt/data}"
@@ -48,7 +51,7 @@ wait_for_endpoint() {
 # ---- stage 1: conversations -------------------------------------------------
 if ! done_marker 01-conversations; then
   log "stage 1: building conversations.jsonl"
-  "$REPO/.venv/bin/python" "$REPO/scripts/build_train_jsonl.py" \
+  python3 "$REPO/scripts/build_train_jsonl.py" \
     --out "$RUNS/conversations.jsonl" || exit 1
   mark 01-conversations
 fi
@@ -56,7 +59,7 @@ fi
 # ---- stage 2: shards --------------------------------------------------------
 if ! done_marker 02-shards; then
   log "stage 2: sharding into $SHARDS"
-  "$REPO/.venv/bin/python" "$REPO/scripts/shard_jsonl.py" \
+  python3 "$REPO/scripts/shard_jsonl.py" \
     --in "$RUNS/conversations.jsonl" --out-dir "$RUNS/shards" --shards "$SHARDS" || exit 1
   mark 02-shards
 fi
@@ -92,9 +95,9 @@ fi
 # ---- stage 4: merge ---------------------------------------------------------
 if ! done_marker 04-merged; then
   log "stage 4: merging shards (cap $MAX_SAMPLES)"
-  "$REPO/.venv/bin/python" "$REPO/scripts/merge_prepared.py" \
+  python3 "$REPO/scripts/merge_prepared.py" \
     --shard-dir "$RUNS/prepared" --out "$RUNS/data" --max-samples "$MAX_SAMPLES" || exit 1
-  "$REPO/.venv/bin/python" "$REPO/scripts/verify_prepared.py" \
+  python3 "$REPO/scripts/verify_prepared.py" \
     --data "$RUNS/data" --model "$MODEL" --sample 400 || exit 1
   mark 04-merged
 fi
@@ -104,10 +107,15 @@ fi
 # stage needs no marker of its own -- re-entering it continues the run.
 wait_for_endpoint || exit 1
 log "stage 5: training"
+# NUM_WORKERS is the throughput knob: in-flight hidden-state requests are
+# NPROC x NUM_WORKERS, and at 1 the trainer spends 91% of each step waiting.
+# Keep NPROC x NUM_WORKERS <= the server's --max-num-seqs.
 exec torchrun --standalone --nproc-per-node "${NPROC:-1}" -m speculators.train \
   --config "$REPO/configs/train_dspark.yaml" \
   --data-path "$RUNS/data" \
   --save-path "$RUNS/checkpoints" \
   --vllm-endpoint "$RENDER_ENDPOINT/v1" \
   --total-seq-len "$SEQ_LENGTH" \
+  --num-workers "${NUM_WORKERS:-8}" \
+  --prefetch-factor "${PREFETCH_FACTOR:-2}" \
   --log-dir "$RUNS/logs"

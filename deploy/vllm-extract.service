@@ -23,10 +23,12 @@ User=sagoyal
 # the unit's environment before docker ever sees it, so the pass-through form
 # silently hands the container empty values and the server comes up on
 # serve_extract.sh's defaults -- wrong window, wrong TP, no warning.
+# Explicit devices, not --gpus all: the trainer takes 4-7 and the two cannot
+# share a card (server ~61 GB + trainer ~57 GB > 139.8 GB).
 ExecStartPre=-/usr/bin/sudo /usr/bin/docker rm -f vllm-extract
 ExecStartPre=/bin/mkdir -p /dev/shm/hidden_states
 ExecStart=/usr/bin/sudo /usr/bin/docker run --rm --name vllm-extract \
-  --gpus all --network host --ipc host \
+  --gpus '"device=0,1,2,3"' --network host --ipc host \
   -v /mnt/data:/mnt/data -v /dev/shm:/dev/shm \
   --env-file /mnt/data/runs/run.env \
   specd:latest bash /mnt/data/src/muse-glimmer-dspark/docker/serve_extract.sh

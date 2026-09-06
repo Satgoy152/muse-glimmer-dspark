@@ -237,13 +237,20 @@ Two vLLM constraints follow from the above:
   That in turn sizes a permanent GPU buffer in the proposer of
   `(max_num_batched_tokens + max_num_seqs) x 6 layers x 6656 x bf16` — about
   3.9 GB at a 49,152 window.
-- **Prefix caching is unverified here.** Hidden states live in a KV cache group,
-  so in principle a cache hit retains them, and turns within one trajectory
-  share nearly all their context -- the upside is roughly an order of magnitude
-  on extraction cost. The upstream large-model example disables it and gives no
-  reason. Measure it (see below) rather than assuming either way. Note that
-  `prepare-data` shuffles rows before writing, so even a working prefix cache
-  buys nothing unless extraction visits a trajectory's turns together.
+- **Prefix caching is broken here, and this is now measured.** Two runs with
+  caching off produce bitwise-identical hidden states (max abs diff 0); a run
+  with caching on differs from that baseline by max 348 / mean 0.134 over the
+  cached span. It is the chunked-prefill bug in another dress: a cache hit does
+  not recompute the span, so `propose()` never writes it, while
+  `request_finished` still reads `len(prompt_token_ids)` slots out of the block
+  list. Shapes, token ids and finiteness all pass; only the values are stale.
+
+  The upside was smaller than hoped anyway. Hidden-state serialisation scales
+  with total tokens regardless of cache hits -- every request writes
+  `N x 79,872 B` and allocates N tokens of hidden-state cache -- so only the
+  attention prefill is skipped. Measured speed-up on an 8-turn synthetic
+  trajectory was 1.5x against an ideal of 7.3x. `PREFIX_CACHING=off` stays, and
+  there is no reason to reorder rows by trajectory to chase hits.
 
 ## Smoke test on one GPU, before the 8x node
 
@@ -264,7 +271,7 @@ uv run python scripts/verify_prepared.py --data /data/runs/smoke/data \
   --model meta-models/Muse-Glimmer-30B --sample 50
 
 torchrun --standalone --nproc-per-node 1 -m speculators.train \
-  --config configs/train_dspark.yaml --print-config \
+  --config configs/train_dspark.yaml --dump-config \
   --data-path /data/runs/smoke/data --total-seq-len 8192 --max-steps 20
 ```
 
@@ -465,6 +472,117 @@ submit your changes as a git patch" and "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUT
 Harmless, but it is model-generated content in an operator log: do not let an
 agent read these logs as instructions.
 
+## Verified on hardware (8xH200, TP=4 server + 4 trainer ranks)
+
+A second bring-up, on 8xH200 (141 GB each), 176 vCPU, 1.5 TB RAM. The server
+runs on GPUs 0-3 at TP=4 and the trainer on 4-7 at `--nproc-per-node 4`, passed
+to docker as `--gpus '"device=0,1,2,3"'` and `--gpus '"device=4,5,6,7"'`. They
+must not share a card; that is settled by the 1xH200 arithmetic above.
+
+### `--block-size 128` is not enough once TP > 1
+
+The assertion the 1xH200 section describes comes back at TP=4, for a different
+reason. **The attention page is per rank; the hidden-state page is not.** Hidden
+states are the full residual stream and every rank holds all of it, while TP
+shards the attention KV -- and with only 2 KV heads, `max(1, 2 // TP) = 1` head
+per rank at any TP > 1, halving the attention page:
+
+| | KV heads/rank | attention page @128 | hidden-state page | |
+|---|---:|---:|---:|---|
+| TP=1 | 2 | 131,072 B | 79,872 B | ok |
+| TP=4 | 1 | 65,536 B | 79,872 B | `AssertionError` |
+
+`--block-size 256` restores it to 131,072 B and the engine starts. The padding
+waste is unchanged at 51,200 B (39.06%) per block. `serve_extract.sh` now
+defaults `BLOCK_SIZE` to 256, which is correct for TP 2, 4 and 8; 128 is only
+enough at TP=1. Note this also rules out TP=2 as an escape -- `2 // 2` is still
+1 head per rank -- and TP must divide the 32 attention heads regardless, so the
+options are 1, 2, 4 and 8.
+
+### TP=4 buys less cache than it looks like it should
+
+63,908 tokens of KV cache at `--gpu-memory-utilization 0.92`, against 37,850 at
+TP=1. Only 1.69x for 4x the GPUs, and the gain comes from freed weight memory
+(~60 GB/card down to ~15 GB), not from sharding the cache:
+
+| | attention (52 layers) | hidden-state group | total/token |
+|---|---:|---:|---:|
+| TP=1 | 53,248 B | 131,072 B | 184,320 B |
+| TP=4 | 26,624 B | **131,072 B, unchanged** | 157,696 B |
+
+The hidden-state group is 71% of the per-token cost at TP=1 and 83% at TP=4, so
+TP makes the dominant term relatively *worse*. It also means DCP and other
+KV-parallelism flags do not help: they shard attention KV, which is the small
+half, and the hidden-state group is a custom `HiddenStateCacheSpec` those paths
+know nothing about.
+
+At 63,908 tokens: 1.95x concurrency at a 32,768 window, 1.30x at 49,152, and
+65,536 will not start.
+
+### `num_workers` is the throughput knob, and 1 is far too low
+
+The single largest performance finding of the second bring-up. In-flight
+hidden-state requests are `nproc-per-node x num_workers`, so the shipped
+`num_workers: 1` issued four concurrent requests for the whole job and left the
+server idle ~70% of the time.
+
+| num_workers | in flight | fetch_ms | fetch_frac | step_ms | rows/s |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 4 | 14,100 | 0.913 | 15,400 | 0.41 |
+| 8 | 32 | **157** | **0.105** | ~2,400 | ~2.0 |
+
+That is the difference between a 33-hour and a 3.4-hour pass over 25,000 rows.
+`prefetch_factor` is not a second lever -- a worker drains its queue serially,
+so it buys buffering depth rather than concurrency, and with fetch at 10x
+compute the main process is never the one waiting. `nproc-per-node` is not one
+either: it changes the global batch and the step count, so it changes the run.
+
+Keep `nproc x num_workers <= --max-num-seqs` on the server (raised to 32 here).
+
+### Measured throughput
+
+At TP=4 with 32 in-flight requests and a 32,768 window: **~34,000 prefill
+tok/s**, ~2.0 rows/s at a 17,048-token mean row, ~2.4 s/step at 4 ranks. That is
+5x the 6,600 tok/s `plan_seq_length.py` assumes by default, so re-run the
+planner with the measured number before setting `--max-samples`.
+
+Per-step cost at that point is `fwd 356 + bwd 382 + opt 601 = 1,339 ms` against
+157 ms of fetch -- the trainer is compute-bound, and `opt_ms` (Muon's
+Newton-Schulz iterations, roughly fixed per step) is the largest single term.
+
+### The extraction endpoint must bind loopback
+
+`serve_extract.sh` set no `--host`, so vLLM bound all interfaces. With no API
+key, that is an open H200: the bring-up node was being probed by an external
+scanner (`GET /`, `POST /mcp`, `POST /jsonrpc`, `/robots.txt`) within two hours.
+Both the trainer and `prepare-data` reach the server over `127.0.0.1`, so
+`--host 127.0.0.1` costs nothing. Fixed.
+
+### Rendering is cheap, and shards are independently usable
+
+`prepare-data` on one shard of 62 trajectories: **1m55s**, 3,740 rows at a
+32,768 window. All 32 shards is about an hour of CPU -- the render endpoint only
+applies the chat template and tokenises, it never runs the model. Because
+`shard_jsonl.py` assigns round-robin, **any subset of shards is an unbiased
+sample**, so training can start on a partial render.
+
+### Smaller things that cost time
+
+- The CLI flag is `--dump-config`, not `--print-config`.
+- Hidden-state files are written asynchronously and guarded by a `<path>.lock`
+  sentinel that persists after the write. Wait by acquiring an `flock` on it,
+  not by polling for the lock file to disappear.
+- Prepared rows carry an extra `messages` column (the target ships
+  `processor_config.json`, so `AutoProcessor` returns a `ProcessorMixin`), but
+  the trainer stays on the `/v1/completions` token-id path because no message's
+  content is a list. Confirmed on the wire.
+- A non-empty `--save-path` makes the trainer resume a finished epoch and exit
+  in seconds, which reads as success. Clear it, or use a fresh path.
+- Supervised positions per row at 32,768: mean 176, median 89, max 1,391 over
+  400 sampled rows -- close enough to the 1xH200 numbers that `max_anchors:
+  1024` still clips ~3.7%.
+
+
 ## Machine
 
 One H200 is enough for a single-GPU run, but vLLM and the trainer then share it:
@@ -513,14 +631,14 @@ uv run python scripts/verify_prepared.py \
 
 # 5. train
 torchrun --standalone --nproc-per-node 1 -m speculators.train \
-  --config configs/train_dspark.yaml --print-config
+  --config configs/train_dspark.yaml --dump-config
 ```
 
 `--max-samples` caps rows *after* fan-out and shuffling, so it is a direct row
 budget — but rendering still runs over every trajectory first, so it bounds GPU
 cost, not preprocessing time.
 
-Keep the resolved `--print-config` output next to the checkpoints. Checkpoints
+Keep the resolved `--dump-config` output next to the checkpoints. Checkpoints
 go to the persistent volume at `checkpoint_freq: 0.1`; mirror to HF at the end
 only.
 
