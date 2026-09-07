@@ -1,0 +1,7 @@
+FROM specd:latest
+# wandb 0.29.0 already ships in specd:latest; tensorboard does not, and
+# configs/train_dflash2.yaml asks for both (wandb to watch the run off-node,
+# tensorboard as the on-volume record that survives a wandb auth/network
+# failure). --no-deps would leave tensorboard unimportable, so deps are
+# resolved, then torch/vllm/transformers are asserted unchanged below.
+RUN pip install --no-cache-dir tensorboard

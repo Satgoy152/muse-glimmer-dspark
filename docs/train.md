@@ -747,3 +747,333 @@ Same frozen 40, same `--concurrent 8`, same one-segment-at-a-time schedule, its
 own `TRACE_DIR` and proxy port. The DSpark patch in `serve_patched.sh` is still
 required: `target_language_model.model` is unguarded on vLLM `main` as of
 2026-09, not only on the 0.28.1rc1 the generation run used.
+
+## The DFlash2 candidate (run D): blocked on the warm start
+
+A parallel candidate fine-tuning `z-lab/Muse-Glimmer-30B-DFlash2` on the same
+data. Everything below was measured on the 8xH200 node; the run is **not
+launched** — the warm start does not load, and the fix is a decision, not a
+patch to apply blindly.
+
+### DFlash2 consumes the same target layers as DSpark
+
+Not obvious from the configs, which disagree on their face:
+
+| repo | key | value |
+|---|---|---|
+| `DaoCloud/…-DSpark` | `aux_hidden_state_layer_ids` | `[2, 14, 26, 38, 50]` |
+| `z-lab/…-DFlash2` | `dflash_config.target_layer_ids` | `[1, 13, 25, 37, 49]` |
+
+They are the same five capture points in two index spaces.
+`convert/dflash/converter.py` maps between them:
+
+```python
+# z-lab reads hidden_states[layer_id + 1] (index 0 is the embedding output)
+# while speculators uses the layer id directly.
+aux_hidden_state_layer_ids = [i + 1 for i in target_layer_ids
+                              if i + 1 != num_verifier_layers]
+```
+
+`[1,13,25,37,49] + 1 = [2,14,26,38,50]`. So **K = 6** (five aux plus the final
+layer), `BLOCK_SIZE` stays **256**, and the extraction server needs no
+reconfiguration between the DSpark and DFlash2 runs. Passing z-lab's raw ids to
+`serve_extract.sh` would silently capture five layers the draft was not built
+for. Confirmed on the wire against the running server:
+
+```
+hidden_states (64, 6, 6656) torch.bfloat16   token_ids match: True   finite: True
+per-layer norms: [719, 1485, 2089, 2490, 4049, 5409]
+GPU KV cache size: 60,392 tokens, Maximum concurrency for 49,153 tokens: 1.23x
+```
+
+### DFlash2 does log acceptance metrics
+
+`models/dflash2/metrics.py` delegates to DSpark's `compute_unary_metrics`, so
+`accept_rate`, `accept_len`, `full_acc` and `position_0..N_acc` all come
+through unchanged. It adds `unary_candidate_recall_at_16`,
+`unary_candidate_target_mass_at_16`, `teacher_forced_selector_acc`,
+`unary_top_16_oracle_accepted_length`, and `selector_loss` / `unary_loss`.
+It drops only the confidence-head metrics, which it calls with
+`confidence_head_alpha=0.0`. So a DFlash2 run is monitorable exactly like run A,
+with more signal, not less.
+
+### `--from-pretrained` rejects the checkpoint
+
+```
+NotImplementedError: Loading a non-speculator model config is not supported yet.
+```
+
+`z-lab/Muse-Glimmer-30B-DFlash2` is a native z-lab checkpoint:
+`architectures: ["DFlash2DraftModel"]` and **no** `speculators_model_type`.
+`DaoCloud/…-DSpark` has `speculators_model_type: dspark`, which is why run A
+warm-started with no conversion step. This is DFlash2-specific.
+
+The architecture itself matches. All 81 tensors line up with speculators'
+`Qwen3DFlash2DecoderLayer` and `CandidateSelector` —
+`layers.*.attention_conv.{base_kernel,kernel_projection.weight}`,
+`layers.*.mlp_conv.*`,
+`candidate_selector.{predecessor_codebook,successor_codebook,hidden_projection.weight}`
+— and q/k/v are unfused, so `_remap_weights` is a no-op. `embed_tokens` /
+`lm_head` are absent by design; the converter fills them from the verifier.
+
+So a conversion is viable and is not a fallback to scratch init.
+
+### …but converting drops two knobs that serving still applies
+
+This is the reason the run is stopped rather than converted.
+
+z-lab's `dflash_config` carries `final_logit_softcapping: 20.0` and
+`output_multiplier: 0.19611613513818404` (a 5.1x logit scale). Neither string
+appears anywhere in `speculators` — the training path does not implement them.
+vLLM's serving path **does**:
+
+```python
+# vllm/model_executor/models/qwen3_dflash2.py:275
+softcap = float(draft_config.get("final_logit_softcapping") or 0.0)
+self.candidate_logits_processor = LogitsProcessor(
+    ..., scale=float(draft_config.get("output_multiplier", 1.0)),
+    soft_cap=softcap if softcap > 0 else None)
+```
+
+and it reads them from the native `dflash_config` dict. A speculators-format
+checkpoint has no such dict; vLLM rebuilds one in
+`transformers_utils/configs/speculators/algos.py`, and `update_dflash2`
+forwards **only** `conv_kernel_size`, `conv_group_size`, `selector_rank` and
+`selector_top_k` — because `DFlash2SpeculatorConfig` has no fields for the other
+two. So a converted checkpoint serves at `scale=1.0` with no softcap.
+
+Two self-consistent positions, and they are not equivalent:
+
+- **Drop the knobs everywhere.** Training and serving agree at `scale=1.0`, no
+  softcap. No library patch. But the pretrained weights were fit for a 0.196
+  scale, so step-0 loss starts high and the fine-tune spends capacity
+  re-learning the output scale — devaluing the warm start the run exists for.
+- **Preserve them.** Keep both keys so vLLM still applies them, and patch
+  speculators' DFlash2 forward to apply the same scale and tanh softcap so
+  training matches. Warm start intact; the checkpoint then depends on that
+  patch at serving time.
+
+What must not happen is preserving them on one side only: training without the
+0.196 scale and serving with it (or the reverse) is a 5.1x logit mismatch, and
+nothing in either stack errors on it.
+
+### Resolved: preserve them, on both sides
+
+Taken, and measured. Three pieces:
+
+- `scripts/convert_dflash2.py` subclasses `DFlashConverter` and emits a
+  `DFlash2SpeculatorConfig`, so the convolutions and the candidate selector are
+  claimed rather than reported as unexpected keys. It reuses the parent's `i+1`
+  layer remap -- but resolves `num_hidden_layers` out of the verifier's
+  `text_config` first. `meta-models/Muse-Glimmer-30B` is a
+  `MuseGlimmerForConditionalGeneration`; the parent reads `num_hidden_layers`
+  and `hidden_size` from the top level and dies with
+  `KeyError: 'num_hidden_layers'`. Its top-level `out_hidden_size` is 6144, the
+  projector output, which must not be mistaken for the drafter's 6656.
+- `patches/speculators-dflash2-output-shaping.patch` adds `output_multiplier`
+  and `final_logit_softcapping` to `DFlash2SpeculatorConfig` and applies them in
+  `DFlash2DraftModel.forward`. Baked into `specd:dflash2`
+  (`docker/Dockerfile.dflash2`); `specd:latest` is the rollback.
+- `docker/serve_patched.sh` forwards the two keys through vLLM's
+  `update_dflash2`, sed-and-verified in place like the DSpark fix above it.
+
+**Order and placement both matter.** vLLM's `LogitsProcessor` is not internally
+consistent: `forward` and `get_top_tokens` soft-cap *then* scale, while
+`get_top_k_tokens` scales *then* soft-caps. DFlash2 takes the last one --
+`DFlash2Qwen3ForCausalLM.compute_candidates` calls `get_top_k_tokens` -- so the
+training-side order is `tanh(x * 0.196 / 20) * 20`.
+
+And vLLM tops-k the *raw* head output, shaping only the k selected values, so
+the patch does the same: select first, shape second. The two orders are
+identical in exact arithmetic (both maps are strictly increasing), but tanh
+saturation ties neighbouring logits in bfloat16 and reorders the tail of the
+candidate set. Shaping first changed the candidate ids on a synthetic batch;
+selecting first reproduces vLLM's ids exactly, leaving only a 0.5% relative
+value difference from vLLM computing in fp32 where training stays in bf16. An
+fp32 copy of `[1, max_anchors * block_size, 202048]` is 13 GB, so bf16 it is.
+
+The shaped values are what the candidate selector adds its transition scores to
+(`CandidateSelector.score_candidates`: `unary_scores + transition_scores`), which
+is why this is not just a loss-scale detail.
+
+Measured at step 0, same seed, same batch, converted checkpoint, 4 ranks:
+
+| | patched | unpatched |
+|---|---:|---:|
+| `train/loss` | **0.406** | 2.155 |
+| `train/ce_loss` | 0.421 | 2.272 |
+| `train/unary_loss` | 0.119 | 0.299 |
+| `train/selector_loss` | **0.287** | 1.857 |
+| `train/accept_rate` | 0.535 | 0.566 |
+| `train/position_1_acc` | 0.911 | 0.909 |
+| `train/position_15_acc` | 0.342 | 0.342 |
+
+The accuracy columns barely move, which is the point: they are argmax-based and
+both maps are monotonic, so the *predictions* are unchanged. What is 6.5x off
+is `selector_loss`. The selector adds its transition scores to the unary
+scores, and at scale 1.0 those unary scores are 5.1x larger than the ones its
+codebooks were fit against, so a converged selector reads as badly
+miscalibrated. That 2.155 is what "devaluing the warm start" costs in practice.
+
+The unpatched build does not error on the converted checkpoint -- it ignores the
+two unknown config keys silently, exactly as predicted.
+
+### Run D happened, and it regressed on Terminal-Bench
+
+Launched 2026-09-06 21:11 UTC, finished 01:05 UTC, exit 0. 3,956 steps, one
+epoch, 25,000 rows at 32,768 rendered to a 10/25/30/35 reasoning-strength mix.
+`specd:dflash2`, warm-started from the converted checkpoint, lr 5e-5 /
+muon_lr 1e-4, warmup 0.10, checkpoint_freq 0.125.
+
+**Training said it worked. Terminal-Bench said it did not.**
+
+| | value |
+|---|---:|
+| `val/accept_len_epoch` | **8.093** |
+| run A (DSpark) `val/accept_len_epoch` | 7.559 |
+| train accept_len, last 200 steps | 8.159 |
+
+| Terminal-Bench acceptance length | |
+|---|---:|
+| baseline | **4.02** |
+| run D mid checkpoint (step 1976) | 3.95 |
+| run D final (step 3956) | 3.80 |
+
+So the training metric improved 7% over run A while the served metric fell
+below baseline, monotonically with training. Those are not contradictory
+measurements of the same thing — see "What training tells you, and what it does
+not". The training number is teacher-forced over anchored blocks against the
+verifier's own logits; the served number is real rejection sampling. A ~2x gap
+between them is normal and run A showed it too. What is not normal is the
+*direction*.
+
+**The leading hypothesis is a serving-side knob drop, and it is untested.**
+A converted checkpoint reaches vLLM through `update_dflash2`, which on stock
+vLLM forwards only the four conv/selector fields and silently discards
+`output_multiplier` and `final_logit_softcapping`. The drafter then serves at
+scale 1.0 with no cap while its weights were trained at 0.196 with a cap of 20 —
+and the mismatch deepens the longer it trains, which is exactly the observed
+shape. The baseline does not suffer this: a native z-lab repo keeps its own
+`dflash_config` and never goes through `update_dflash2`.
+
+Check first, on the eval host:
+
+```bash
+grep -c output_multiplier \
+  /usr/local/lib/python3.12/dist-packages/vllm/transformers_utils/configs/speculators/algos.py
+```
+
+`0` means the patch was absent and the eval measured the mismatch, not the
+fine-tune.
+
+**The control that was never run.** The whole run validated the *training* path
+and never once served a converted checkpoint. The missing datapoint separates
+every hypothesis:
+
+> Serve `scripts/convert_dflash2.py`'s output — converted but UNTRAINED, weights
+> numerically identical to z-lab's — against the native z-lab repo on the same
+> harness.
+>
+> - scores ≈ baseline → conversion and serving are sound; training caused the
+>   regression (look at the data mix and the LR).
+> - scores below baseline → the serving path is lossy; training is innocent.
+
+Run that before changing anything else. Rebuilding it is minutes:
+`convert_dflash2.py` is deterministic.
+
+**Other candidates, if the knobs are ruled out.**
+
+- *The data mix.* 35% xhigh against a corpus that is 10%. It was called
+  eval-matched, but it was never checked against Terminal-Bench's actual
+  reasoning-strength distribution. Training hard on the wrong distribution
+  degrades monotonically, which fits.
+- *LR / forgetting.* 5e-5 with muon 1e-4 for a full epoch on a narrow 25k set,
+  starting from an already-converged drafter. Also degrades monotonically, and
+  also explains mid > end.
+- *Not classic overfitting.* Train and val tracked each other throughout and val
+  was still improving at the end. The failure is a proxy-metric failure: the
+  objective kept improving while the thing that mattered got worse.
+
+### speculators keeps exactly ONE checkpoint on disk
+
+`checkpoint_freq: 0.125` does not give you eight checkpoints. Every checkpoint
+overwrites the same directory (`<save_path>/0`) and re-points an
+`epoch0_step<N>` symlink at it, unlinking the previous one. At any moment
+exactly one exists, so `save_best: false` plus replay-based selection has
+nothing to select from.
+
+`scripts/watch_and_push.sh` works around it: it copies each checkpoint aside as
+the symlink appears (the symlink is written *after* the checkpoint, so its
+appearance means the slot is safe to read), then pushes to HF when the trainer
+exits. Run it alongside any run whose checkpoints you intend to compare.
+
+### Artifacts
+
+Two checkpoints survive on HF, private, 11.30 GB each — the GPU node and its
+volume are gone, so these and this repo are the only copies:
+
+- `Satgoy152/Muse-Glimmer-30B-DFlash2-Coding/run-d-32k-mix` — final, step 3956
+- `Satgoy152/Muse-Glimmer-30B-DFlash2-Coding/run-d-32k-mix-step1976` — mid
+
+Both carry `output_multiplier: 0.19611613513818404` and
+`final_logit_softcapping: 20.0` in `config.json`, verified after upload. Each
+folder is half `optimizer_state_dict.pt`, which is only needed to resume
+training, not to serve.
+
+`serve_patched.sh` takes a repo **root**, not a subfolder — `hf download` the
+subfolder to a local path and point `SPECULATOR` at that. And it must run on
+the patched vLLM, or it discards the knobs the checkpoint depends on.
+
+### The multiplier-folding shortcut, not taken
+
+Pre-multiplying `lm_head.weight` by 0.196 at conversion reaches the same
+numbers for that one knob with no library change. It was left on the shelf
+because it only covers the scale: the soft cap is not a linear map and cannot
+be folded into a weight, so `final_logit_softcapping` would still need the
+code path. It also silently desynchronises the checkpoint from its own config
+-- the served `output_multiplier` would have to be forced to 1.0 or the scale
+gets applied twice. Keep it as the fallback if the patch ever fails to rebase.
+
+### The 32,768 data cannot be reused for a 48k run
+
+Run A's `/mnt/data/runs/data` is 25,000 rows rendered at 32,768. Turns whose
+prompt alone exceeded that window were skipped at render time
+(`_render_boundary_rows`), so the rows a 49,152 window would add are not in the
+set and cannot be recovered from it. Widening the window means re-rendering from
+`conversations.jsonl`; the prepared rows themselves are drafter-agnostic, so
+that is the only reason to re-render, not the change of drafter.
+
+Measured re-render cost at 49,152: **~2.9 min/shard, ~93 min for all 32**, about
+4,600-4,800 rows per shard (~150k total, against 125k at 32,768).
+
+### Reasoning strength needs stratifying, not just capping
+
+`merge_prepared.py` shuffles and caps, which preserves the corpus mix — at
+32,768 that came out **medium 31.3% / high 30.9% / low 27.3% / xhigh 10.4%**,
+because only 198 of the 1,981 trajectories are xhigh.
+`merge_prepared_balanced.py` draws an equal quota per level instead,
+redistributing any level's shortfall across the rest so the row budget is still
+met. At 49,152 there are ~15k xhigh rows available against the 7,500 a balanced
+30,000-row set needs, so a true four-way balance is reachable here.
+
+It reads the level back out of the rendered system message rather than a
+metadata column, so the balance is measured on what the chat template actually
+honoured.
+
+### Smaller things
+
+- `--save-best` is `store_true` with no `--no-save-best`, so `save_best: false`
+  can only be set in the YAML. Run A's config had it `true`, which is consistent
+  with the missing-checkpoint hypothesis; `configs/train_dflash2.yaml` sets it
+  `false` with `checkpoint_freq: 0.25`.
+- `tensorboard` is **not** in `specd:latest` (wandb 0.29.0 is). A config asking
+  for `logger: wandb,tensorboard` dies at startup with
+  `Could not initialize TensorBoardHandler`. Installing it pulls only absl-py,
+  markdown, werkzeug and tensorboard-data-server, and leaves torch 2.13.0+cu130,
+  vllm 0.28.1rc1.dev437 and transformers 5.16.1 untouched — verified before
+  retagging. `specd:pre-tb` is the rollback tag.
+- DFlash2 and DSpark reach the same 15-token draft length differently:
+  DSpark uses `block_size 15` with `sample_from_anchor: true`, z-lab's DFlash2
+  uses `block_size 16` with `sample_from_anchor: false` (the dflash2 default).
+  `block_size 15` at the dflash2 default drafts **14** tokens and is comparable
+  to neither run A nor the 3.913 baseline.

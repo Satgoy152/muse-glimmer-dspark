@@ -102,7 +102,22 @@ trainer:
   # The GPU node is preemptible. 0.1 = ten checkpoints per epoch, onto the
   # persistent volume; mirror to HF only at the end.
   checkpoint_freq: 0.1
-  save_best: true
+  # MUST stay false, or checkpoint_freq is dead code. save_best gates BOTH
+  # save paths in trainer.py, not just best-selection:
+  #   train_epoch()          `and not self.config.save_best` -> the periodic
+  #                          mid-epoch save is never called at all
+  #   maybe_save_checkpoint() returns early on `self.config.save_best` -> even
+  #                          the end-of-epoch save at run_training() is a no-op
+  # With save_best: true the ONLY writer left is maybe_update_best(), which
+  # needs a validation improvement, and validation runs only at epoch end -- so
+  # a 1-epoch run gets at most one checkpoint, at the very end. That is what
+  # left the previous node with nothing on disk through step 1577.
+  #
+  # save_best: false loses nothing: maybe_update_best() still maintains the
+  # checkpoint_best symlink and writes val metrics when checkpoint_freq < 1
+  # (it only early-returns when checkpoint_freq >= 1), and
+  # cleanup_keep_only_best() is skipped, so periodic checkpoints are retained.
+  save_best: false
   save_path: runs/dspark/checkpoints
 
 generation:
