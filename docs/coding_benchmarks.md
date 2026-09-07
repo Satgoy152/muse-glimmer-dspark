@@ -161,6 +161,15 @@ neither `config.json` carries the knobs (the only `final_logit_softcapping`
 reader outside DFlash2 is `gemma4_dspark.py`, a different model family).
 `dflash-official` is a plain DFlash1 checkpoint and never touches this path.
 
+This is the trap `docs/HANDOFF-dflash2.md` already names: its step 1 is
+`grep -c output_multiplier .../speculators/algos.py`, with "`0` means the eval
+measured a 5.1x logit mismatch, not the fine-tune". The count is 0 on the image
+these sweeps used, so run D's Terminal-Bench regression (4.02 baseline -> 3.80
+final) and the two rows here are all the same unresolved confound rather than
+three independent results. That is one more reason to treat the DFlash2
+fine-tune as unmeasured: nothing has yet compared it against its baseline on an
+even footing.
+
 **To resolve it:** re-run that one drafter on both tasks with a serve script
 carrying the vLLM-side fix (the patched `docker/serve_patched.sh`, or
 `patches/vllm-dflash2-output-shaping.patch`), and confirm

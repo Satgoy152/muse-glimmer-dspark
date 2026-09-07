@@ -1,0 +1,40 @@
+Forward DFlash2's output-shaping knobs through vLLM's speculators config path.
+
+Generated against vllm 0.28.1rc1.dev437+ge962733e0.
+
+`update_dflash2` rebuilds a native `dflash_config` from a speculators-format
+checkpoint, and `DFlash2Qwen3ForCausalLM` reads `output_multiplier` and
+`final_logit_softcapping` straight back out of that dict to build
+`LogitsProcessor(scale=..., soft_cap=...)`. Stock vLLM forwards only the four
+conv/selector fields, so a converted checkpoint serves at scale=1.0 with no
+softcap -- while its weights were fit for 0.196 and a cap of 20.0.
+
+Native z-lab checkpoints are unaffected: they keep their own `dflash_config`
+and never go through `update_dflash2`. This only matters for converted ones,
+which is exactly what scripts/convert_dflash2.py produces.
+
+docker/serve_patched.sh applies this with sed at container start (idempotent,
+verified); patches/apply_dflash2_output_shaping.py --vllm applies it in place.
+
+--- a/vllm/transformers_utils/configs/speculators/algos.py
++++ b/vllm/transformers_utils/configs/speculators/algos.py
+@@ -144,11 +144,19 @@
+     update_dflash(config_dict, pre_trained_config)
+     pre_trained_config["architectures"] = ["DFlash2DraftModel"]
+
++    # output_multiplier / final_logit_softcapping are read straight back out of
++    # dflash_config by DFlash2Qwen3ForCausalLM, which builds
++    # LogitsProcessor(scale=..., soft_cap=...) from them. Without them here a
++    # converted checkpoint serves at scale=1.0 with no cap, while the z-lab
++    # weights it came from were fit for a 0.196 scale -- a 5.1x logit mismatch
++    # that nothing in either stack errors on.
+     for key in (
+         "conv_kernel_size",
+         "conv_group_size",
+         "selector_rank",
+         "selector_top_k",
++        "output_multiplier",
++        "final_logit_softcapping",
+     ):
+         if config_dict.get(key) is not None:
+             pre_trained_config["dflash_config"][key] = config_dict[key]

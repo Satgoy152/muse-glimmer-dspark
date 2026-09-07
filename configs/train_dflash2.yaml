@@ -1,0 +1,151 @@
+# DFlash2 drafter for meta-models/Muse-Glimmer-30B, fine-tuned on the same
+# agentic coding traces as configs/train_dspark.yaml. Run A trained DSpark on
+# this data; this is the parallel DFlash2 candidate. Run with:
+#
+#   torchrun --standalone --nproc-per-node 4 -m speculators.train \
+#     --config configs/train_dflash2.yaml
+#
+# Anything here can be overridden on the command line (flag > yaml > default).
+# `--dump-config` dumps the fully resolved result; keep that with the run.
+
+speculator_type: dflash2
+seed: 20260830
+
+verifier:
+  verifier_name_or_path: meta-models/Muse-Glimmer-30B
+  trust_remote_code: false
+
+draft:
+  # NOT the z-lab repo directly: it is native z-lab format with no
+  # `speculators_model_type`, and SpeculatorModelConfig.from_pretrained raises
+  # `NotImplementedError: Loading a non-speculator model config is not
+  # supported yet`. scripts/convert_dflash2.py produces this directory, keeping
+  # output_multiplier (0.196) and final_logit_softcapping (20.0) on the config
+  # so training and serving agree on the logit scale. Requires specd:dflash2 --
+  # stock speculators ignores both keys silently and trains at scale 1.0.
+  from_pretrained: /mnt/data/runs/dflash2-speculators
+  # z-lab's config.json carries dflash_config.target_layer_ids = [1,13,25,37,49],
+  # which is NOT the same index space as this field. speculators' own converter
+  # (convert/dflash/converter.py) maps it with `i + 1`:
+  #
+  #   # z-lab reads hidden_states[layer_id + 1] (index 0 is the embedding
+  #   # output) while speculators uses the layer id directly.
+  #
+  # So [1,13,25,37,49] + 1 = [2,14,26,38,50] -- identical to DSpark's
+  # aux_hidden_state_layer_ids. The two drafters consume the SAME capture
+  # points, and the extraction server needs no reconfiguration between runs.
+  # Passing z-lab's raw ids here would silently capture the wrong five layers.
+  target_layer_ids: [2, 14, 26, 38, 50]
+  draft_vocab_size: 202048   # full verifier vocab, no d2t/t2d mapping
+  mask_token_id: 201818
+
+data:
+  # Built by scripts/merge_prepared_balanced.py from /mnt/data/runs/prepared
+  # (the 32,768 render) at low 10 / medium 25 / high 30 / xhigh 35, 25,000 rows
+  # -- an eval-matched quota, not the corpus mix (27/31/31/10) and not balanced
+  # quarters. xhigh is the binding level: 35% of 25,000 needs 8,750 rows against
+  # ~12,400 in the full 32-shard render, drawn from ~192 distinct xhigh
+  # trajectories (6 per shard, evenly distributed by shard_jsonl.py).
+  #
+  # A separate directory rather than overwriting /mnt/data/runs/data: that is
+  # run A's exact training set at the corpus mix, and clobbering it would make
+  # run A unreproducible for no gain.
+  data_path: /mnt/data/runs/data-32k-mix
+  # MUST equal prepare-data --seq-length for the rendered set in data_path.
+  # 32,768, matching run A, so run D is comparable to it and costs the same per
+  # row. 49,152 would cover 92.4% of Terminal-Bench's decoded tokens against
+  # 75.5% here, at ~1.5x the tokens per row; the full 49,152 render is on disk
+  # under /mnt/data/runs/prepared-48k if that trade is ever worth revisiting.
+  total_seq_len: 32768
+  train_data_ratio: 0.99
+  hidden_states_backend: file
+  hidden_states_dtype: bfloat16
+  # In-flight hidden-state requests = nproc-per-node x num_workers. At 1 the
+  # trainer waits 91% of every step (fetch_frac 0.913 -> 0.105 at 8).
+  # Keep nproc x num_workers <= the server's --max-num-seqs (32).
+  num_workers: 8
+  prefetch_factor: 2
+  max_anchors: 1024
+
+dflash:
+  # The draft length that matters is 15 -- the baseline's
+  # num_speculative_tokens, and what 3.913 was measured at. DFlash2 and DSpark
+  # parameterise that differently, so the numbers here differ from run A's
+  # while describing the same draft length:
+  #
+  #   sample_from_anchor false => anchor is the bonus token, only the mask
+  #     positions predict, so speculative tokens = block_size - 1.
+  #   sample_from_anchor true  => anchor and masks both predict, = block_size.
+  #
+  # This is z-lab's own parameterisation and matches how the checkpoint was
+  # trained: block_size 16, anchor not sampled, 15 speculative tokens.
+  # (Run A's DSpark reached the same 15 as block_size 15 + anchor sampled.)
+  # Both defaults for dflash2, but pinned explicitly so the draft length is
+  # not silently changed by a future default.
+  block_size: 16
+  sample_from_anchor: false
+  dflash_decay_gamma: 4.0
+  # Explicit rather than default-resolved: dflash2 resolves to fixed-exp-decay,
+  # matching DSpark. Only plain `dflash` defaults to dpace.
+  per_position_loss_weight: fixed-exp-decay
+
+dflash2:
+  # All four structural values match z-lab/Muse-Glimmer-30B-DFlash2's
+  # dflash_config, so the warm start does not reshape anything.
+  conv_kernel_size: 2
+  conv_group_size: 16
+  selector_rank: 256
+  selector_top_k: 16
+  # Weight on the K-way candidate-selector CE term, added to the unary DFlash
+  # objective. This is the term DSpark has no analogue for.
+  selector_loss_alpha: 1.0
+
+loss:
+  loss_fn: '{"ce": 0.1, "tv": 0.9}'
+
+optimizer:
+  optimizer: muon
+  # Same as run A: this is a fine-tune of a converged drafter, not a scratch
+  # init. muon_lr must be explicit -- unset it resolves to 10 * lr.
+  lr: 5e-5
+  muon_lr: 1e-4
+
+scheduler:
+  scheduler_type: cosine
+  # 0.10, not the 0.03 run A used. This is a warm start whose output scale is
+  # already correct (see the output-shaping patch), so the risk is not slow
+  # convergence -- it is the first few hundred steps at full LR knocking a
+  # converged drafter off a good initialisation before the schedule settles.
+  # Run A did nearly all its movement inside 150 steps; a longer ramp buys
+  # that phase back.
+  scheduler_warmup_ratio: 0.10
+
+trainer:
+  epochs: 1
+  # 0.125 = eight checkpoints per epoch. The LR is deliberately left at
+  # 5e-5 / 1e-4 rather than tuned down; the plan is to pick the best checkpoint
+  # by replay eval instead of guessing the LR, which needs enough checkpoints
+  # to actually choose between.
+  checkpoint_freq: 0.125
+  # Run A wrote nothing through step 1577; the hypothesis is save_best gating
+  # on a validation that only runs at epoch end. Off until checkpoints are
+  # observed landing.
+  save_best: false
+  save_path: /mnt/data/runs/checkpoints-dflash2
+
+generation:
+  vllm_endpoint: http://127.0.0.1:8000/v1
+  on_missing: generate
+  on_generate: delete
+  request_timeout: 900
+  max_retries: 5
+
+logging:
+  # WANDB_API_KEY and HF_TOKEN live in /mnt/data/runs/secrets.env (chmod 600,
+  # outside the repo -- run.env is committed as an example and must stay
+  # secret-free). Pass it with a second --env-file at docker run.
+  # wandb also wants WANDB_RUN_ID and WANDB_RESUME=allow in the environment, or
+  # every preemption restart opens a new run and the curves come out in pieces.
+  logger: wandb,tensorboard
+  run_name: dflash2-swegym-48k
+  log_dir: /mnt/data/runs/logs-dflash2

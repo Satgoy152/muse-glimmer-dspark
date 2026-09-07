@@ -39,6 +39,29 @@ if [ -f "$F" ]; then
   echo "dspark patch OK: $(grep -n 'target_inner = ' "$F")"
 fi
 
+# Stock vLLM drops DFlash2's two output-shaping knobs when it rebuilds a
+# dflash_config from a speculators-format checkpoint. update_dflash2() forwards
+# only conv_kernel_size, conv_group_size, selector_rank and selector_top_k --
+# and DFlash2Qwen3ForCausalLM reads output_multiplier and
+# final_logit_softcapping straight back out of that same dict to build
+# LogitsProcessor(scale=..., soft_cap=...). Without them, a converted
+# z-lab/Muse-Glimmer-30B-DFlash2 serves at scale=1.0 with no cap while its
+# weights (and, with patches/speculators-dflash2-output-shaping.patch, its
+# fine-tune) were fit for 0.196 and a cap of 20.0. That is a 5.1x logit
+# mismatch and nothing in the stack errors on it.
+#
+# Native z-lab checkpoints are unaffected -- they keep their own dflash_config
+# and never go through update_dflash2. This only matters for converted ones.
+G=/usr/local/lib/python3.12/dist-packages/vllm/transformers_utils/configs/speculators/algos.py
+if [ -f "$G" ]; then
+  if ! grep -q '"output_multiplier",' "$G"; then
+    sed -i 's/^        "selector_top_k",$/        "selector_top_k",\n        "output_multiplier",\n        "final_logit_softcapping",/' "$G"
+  fi
+  grep -q '"final_logit_softcapping",' "$G" || {
+    echo "DFLASH2 OUTPUT-SHAPING PATCH FAILED" >&2; exit 1; }
+  echo "dflash2 knob patch OK: $(grep -c '"output_multiplier",' "$G") site(s)"
+fi
+
 # --per-request-spec-decode-metrics puts acceptance length and draft acceptance
 # rate in each response body. The aggregate vllm:spec_decode_* counters are
 # server-global and blend in any other workload sharing the endpoint; the

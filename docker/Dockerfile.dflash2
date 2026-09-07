@@ -1,0 +1,47 @@
+# specd:dflash2 -- specd:latest plus DFlash2 output shaping in the TRAINING path.
+#
+# z-lab/Muse-Glimmer-30B-DFlash2 carries two output-shaping knobs in its
+# dflash_config: output_multiplier 0.19611613513818404 (a 5.1x logit scale) and
+# final_logit_softcapping 20.0. vLLM applies both when it serves the drafter
+# (model_executor/models/qwen3_dflash2.py builds LogitsProcessor(scale=...,
+# soft_cap=...)); stock speculators implements neither, so a converted
+# checkpoint would train at scale 1.0 and serve at 0.196. Nothing in either
+# stack errors on that -- it just wastes the warm start.
+#
+# The patcher adds the two fields to DFlash2SpeculatorConfig and applies them to
+# the unary logits in DFlash2DraftModel.forward, in the same order vLLM's
+# get_top_k_tokens does (scale, then tanh soft cap), and after the top-k rather
+# than before it (vLLM selects on the raw logits).
+#
+# The serving side is patched at run time instead, by docker/serve_patched.sh:
+# it is one key list in vllm/transformers_utils/configs/speculators/algos.py,
+# and keeping it out of the image keeps the eval image pinned to the exact
+# nightly digest the baseline was measured against. Pass --vllm to the patcher
+# below if you would rather bake it in -- but then EVAL AND BASELINE MUST USE
+# THE SAME IMAGE, or the comparison silently measures the patch instead of the
+# checkpoint.
+#
+# Build:
+#   sudo docker build -f docker/Dockerfile.dflash2 -t specd:dflash2 .
+# Rollback: specd:latest is untouched.
+FROM specd:latest
+
+COPY patches/apply_dflash2_output_shaping.py /opt/patches/apply_dflash2_output_shaping.py
+
+# dist-packages is what `import speculators` resolves to; /opt/speculators/src
+# is the checkout the image was built from and is patched too so a PYTHONPATH or
+# editable install cannot silently pick up the unpatched copy.
+RUN set -eux; \
+    python3 /opt/patches/apply_dflash2_output_shaping.py; \
+    if [ -d /opt/speculators/src/speculators/models/dflash2 ]; then \
+      python3 /opt/patches/apply_dflash2_output_shaping.py --root /opt/speculators/src; \
+    fi; \
+    python3 /opt/patches/apply_dflash2_output_shaping.py --check
+
+# The patch touches speculators only. Assert the pinned stack is byte-identical
+# to specd:latest, the same check docker/Dockerfile.tensorboard makes.
+RUN python3 -c "\
+import torch, vllm, transformers; \
+v = (torch.__version__, vllm.__version__, transformers.__version__); \
+print(v); \
+assert v == ('2.13.0+cu130', '0.28.1rc1.dev437+ge962733e0', '5.16.1'), v"

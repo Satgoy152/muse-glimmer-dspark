@@ -1,0 +1,126 @@
+Apply DFlash2's output_multiplier and final_logit_softcapping during training.
+
+Generated against speculators 0.8.0.dev0. This file is the human-readable
+record of the change; APPLY IT WITH patches/apply_dflash2_output_shaping.py,
+which anchors on strings rather than line numbers and is idempotent. The line
+offsets below were reconstructed and are indicative, not exact.
+
+z-lab/Muse-Glimmer-30B-DFlash2 carries output_multiplier 0.19611613513818404
+and final_logit_softcapping 20.0 in its dflash_config. vLLM applies both when
+serving; stock speculators implements neither, so a converted checkpoint trains
+at scale 1.0 and serves at 0.196.
+
+Measured at step 0, same seed and batch, converted checkpoint, 4 ranks:
+
+    train/loss           0.406 patched   vs   2.155 unpatched
+    train/unary_loss     0.119 patched   vs   0.299 unpatched
+    train/selector_loss  0.287 patched   vs   1.857 unpatched
+
+Accuracy metrics barely move (both maps are monotonic, so argmax predictions are
+unchanged). What is 6.5x off is selector_loss: the selector scores
+`unary_scores + transition_scores`, and at scale 1.0 the unary term is 5.1x
+larger than the one its codebooks were fit against.
+
+ORDER MATTERS, TWICE:
+  1. scale, THEN soft cap. vLLM's LogitsProcessor is not internally consistent
+     -- `forward` and `get_top_tokens` soft-cap then scale, while
+     `get_top_k_tokens` scales then soft-caps. DFlash2 takes the last one
+     (DFlash2Qwen3ForCausalLM.compute_candidates), so training matches that.
+  2. select, THEN shape. vLLM tops-k the RAW head output and shapes only the k
+     selected values. The two orders agree in exact arithmetic (both maps are
+     strictly increasing) but tanh saturation ties neighbouring logits in
+     bfloat16 and reorders the tail of the candidate set. Verified: shaping
+     first changed the candidate ids on a synthetic batch; selecting first
+     reproduces vLLM's ids exactly, leaving only a 0.5% relative value
+     difference from vLLM computing in fp32 where training stays in bf16.
+
+--- a/speculators/models/dflash2/config.py
++++ b/speculators/models/dflash2/config.py
+@@ -43,3 +43,26 @@ class DFlash2SpeculatorConfig(DFlashSpeculatorConfig):
+         ge=1,
+         description="Number of unary candidates reranked during inference.",
+     )
++    output_multiplier: float = Field(
++        default=1.0,
++        gt=0.0,
++        description=(
++            "Multiplier applied to the draft LM head logits before the candidate "
++            "selector and the loss. z-lab DFlash2 checkpoints carry this in "
++            "`dflash_config.output_multiplier` and vLLM applies it at serving "
++            "time (LogitsProcessor(scale=...)), so training must apply the same "
++            "factor or the fine-tune re-learns the output scale. Must be "
++            "positive: vLLM's local top-k reduction rejects non-positive scales."
++        ),
++    )
++    final_logit_softcapping: float | None = Field(
++        default=None,
++        gt=0.0,
++        description=(
++            "If set, the scaled logits are squashed as `tanh(x / cap) * cap` "
++            "before the candidate selector and the loss, matching vLLM's "
++            "LogitsProcessor(soft_cap=...). Applied *after* output_multiplier, "
++            "which is the order LogitsProcessor.get_top_k_tokens uses -- the "
++            "path DFlash2 serving actually takes. None disables it."
++        ),
++    )
+
+--- a/speculators/models/dflash2/core.py
++++ b/speculators/models/dflash2/core.py
+@@ -115,6 +115,42 @@ class DFlash2DraftModel(DFlashDraftModel):
+         }
+         return dict(shared), dict(shared)
+
++    def _shape_output_logits(self, logits: torch.Tensor) -> torch.Tensor:
++        """Apply the checkpoint's output scale and soft cap to the unary logits.
++
++        z-lab DFlash2 checkpoints are trained with a logit multiplier and a tanh
++        soft cap (``dflash_config.output_multiplier`` /
++        ``final_logit_softcapping``). vLLM applies both when serving:
++        ``DFlash2Qwen3ForCausalLM`` builds ``LogitsProcessor(scale=..., soft_cap=...)``
++        and ``compute_candidates`` calls ``get_top_k_tokens``, which does
++
++            values = values * scale
++            values = tanh(values / soft_cap) * soft_cap
++
++        i.e. **scale first, then cap**. (The generic ``forward`` and
++        ``get_top_tokens`` paths on that class apply them the other way round;
++        DFlash2 does not take either.) Training has to match, or a warm-started
++        drafter spends its capacity re-learning the output scale and the served
++        checkpoint disagrees with the trained one by 5.1x on the logits.
++
++        Both maps are strictly increasing, so the unary top-k -- the serving
++        candidate set -- is unchanged. What does change is the *value* the
++        candidate selector adds its transition score to
++        (``CandidateSelector.score_candidates``: ``unary_scores + transition_scores``)
++        and the scale the unary loss sees.
++
++        Applied in the logits' own dtype rather than vLLM's float32: the tensor
++        is ``[1, num_anchors * block_size, vocab_size]`` and an fp32 copy at
++        max_anchors 1024 / block_size 16 / vocab 202,048 is 13 GB.
++        """
++        scale = getattr(self.config, "output_multiplier", 1.0)
++        if scale != 1.0:
++            logits = logits * scale
++        soft_cap = getattr(self.config, "final_logit_softcapping", None)
++        if soft_cap:
++            logits = torch.tanh(logits / soft_cap) * soft_cap
++        return logits
++
+     def _predecessor_ids(
+         self,
+         input_ids: torch.Tensor,  # shape: [1, total_seq_len]
+@@ -164,6 +200,14 @@ class DFlash2DraftModel(DFlashDraftModel):
+         # shape: [1, num_anchors*block_size]
+         candidate_ids = unary_logits.topk(self.candidate_selector.top_k, dim=-1).indices
+         # shape: [1, num_anchors*block_size, top_k]
++        # Select on the raw head output, then shape -- the order
++        # LogitsProcessor.get_top_k_tokens uses at serving time. Scale and tanh
++        # cap are both strictly increasing, so the two orders agree in exact
++        # arithmetic, but tanh saturation ties neighbouring logits in bfloat16
++        # and would reorder the tail of the candidate set. Everything downstream
++        # (the selector's additive transition scores, the unary loss) sees the
++        # shaped values, which is what serving scores.
++        unary_logits = self._shape_output_logits(unary_logits)
+         training_candidate_ids, target_positions, contains_target = (
+             selector_training_candidates(candidate_ids, target_ids)
+         )
