@@ -454,9 +454,9 @@ that the two orderings disagree and neither is resolved.
 
 ## Task 2 — SWE-bench Multilingual
 
-**Selection, recording, resolved rate and 6 of 8 replays complete.** Two replay
-drafters and two controls were still running when this was written; each is
-marked below.
+**Selection, recording, all 8 replays and resolved rate complete.** Two controls
+— a second target-only rollout and a same-drafter replay repeat — were still
+running when this was written, and are marked where they matter.
 
 ### Task selection and disjointness
 
@@ -538,17 +538,18 @@ temperature 1.0 / top_k 64 / concurrency 10 / `NUM_SPEC_TOKENS` 15 — the same
 settings as the Terminal-Bench full-set rows, so the two benchmarks are directly
 comparable to each other (and, unlike task 1, to `docs/RESULTS-paired.md`).
 
-**Six of eight drafters complete;** `dspark-community` and `dspark-run-b-49k`
-were still running when this was written.
+All eight drafters complete.
 
-| drafter | accept_len (step-w) | accept_len (per-req) | t_step ms | decode tok/s | vs no-spec | TTFT s |
-|---|---:|---:|---:|---:|---:|---:|
-| *no speculation* | 1.000 | — | 19.42 | 51.8 | 1.00x | 0.209 |
-| `dflash-official` | 4.708 | 6.483 | 36.88 | 127.0 | 2.45x | 0.316 |
-| `dflash2` | 4.796 | 6.362 | 37.87 | 126.7 | 2.45x | 0.321 |
-| **ours `dflash2-run-d-mid`** | **5.081** | **7.500** | 37.10 | **136.2** | **2.63x** | 0.388 |
-| **ours `dflash2-run-d-final`** | **5.058** | **7.549** | 37.80 | 133.0 | **2.57x** | 0.319 |
-| ours `dspark-run-a-32k` | 4.780 | 7.286 | 37.86 | 124.7 | 2.41x | 0.320 |
+| drafter | accept_len (step-w) | accept_len (per-req) | t_step ms | decode tok/s | vs no-spec |
+|---|---:|---:|---:|---:|---:|
+| *no speculation* | 1.000 | — | 19.42 | 51.8 | 1.00x |
+| `dflash-official` | 4.708 | 6.483 | 36.88 | 127.0 | 2.45x |
+| `dflash2` | 4.796 | 6.362 | 37.87 | 126.7 | 2.45x |
+| **ours `dflash2-run-d-mid`** | **5.081** | **7.500** | 37.10 | **136.2** | **2.63x** |
+| **ours `dflash2-run-d-final`** | **5.058** | **7.549** | 37.80 | 133.0 | **2.57x** |
+| `dspark-community` | 3.306 | 3.387 | 35.62 | 93.2 | 1.80x |
+| ours `dspark-run-a-32k` | 4.780 | 7.286 | 37.86 | 124.7 | 2.41x |
+| ours `dspark-run-b-49k` | 4.795 | 7.348 | 37.70 | 125.6 | 2.43x |
 
 Paired bootstrap against `dflash2`, 2,000 resamples, n=2,742:
 
@@ -556,8 +557,20 @@ Paired bootstrap against `dflash2`, 2,000 resamples, n=2,742:
 |---|---:|---|---:|---:|
 | ours `dflash2-run-d-mid` | **+0.300** | **[+0.189, +0.418]** | +1.243 ±0.094 | 71% |
 | ours `dflash2-run-d-final` | **+0.272** | **[+0.160, +0.387]** | +1.311 ±0.089 | 73% |
+| ours `dspark-run-b-49k` | +0.003 | [−0.113, +0.121] | +1.116 ±0.092 | 67% |
 | ours `dspark-run-a-32k` | +0.008 | [−0.098, +0.112] | +1.041 ±0.093 | 66% |
 | `dflash-official` | −0.075 | [−0.177, +0.022] | +0.058 ±0.068 | 51% |
+| `dspark-community` | **−1.481** | [−1.580, −1.393] | −2.971 ±0.087 | 4% |
+
+**The two poolings say different things about the DSpark fine-tunes, and both
+are worth having.** `dspark-run-a-32k` and `dspark-run-b-49k` are indis­tinguishable
+from `dflash2` step-weighted (+0.008 and +0.003) yet **+1.04 and +1.12 per
+request**, winning two calls in three. They win the typical call and lose the
+tokens, which is the same split `docs/RESULTS-paired.md` found on Terminal-Bench.
+Against the checkpoint they were warm-started from they are ahead on everything:
+`dspark-community` sits at 3.306 step-weighted and 3.387 per request, −1.481 and
+−2.971 against `dflash2`, and it is the only drafter here under 2.0x on
+throughput.
 
 **Both DFlash2 fine-tunes beat native `dflash2` on this benchmark, on both
 poolings, with intervals clear of zero.** On Terminal-Bench at identical
