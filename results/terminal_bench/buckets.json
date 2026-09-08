@@ -1,0 +1,1359 @@
+{
+ "labels": [
+  "<2K",
+  "2-8K",
+  "8-16K",
+  "16-32K",
+  "32-64K",
+  "64K+"
+ ],
+ "segments": [
+  "low",
+  "medium",
+  "high",
+  "xhigh"
+ ],
+ "data": {
+  "dflash-official": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 2740.0,
+    "accepted": 7623.0,
+    "drafted": 41100.0,
+    "out_tok": 10351.0
+   },
+   "<2K|xhigh": {
+    "calls": 26.0,
+    "steps": 713.0,
+    "accepted": 3696.0,
+    "drafted": 10695.0,
+    "out_tok": 4403.0
+   },
+   "<2K|low": {
+    "calls": 26.0,
+    "steps": 1001.0,
+    "accepted": 4697.0,
+    "drafted": 15015.0,
+    "out_tok": 5678.0
+   },
+   "2-8K|low": {
+    "calls": 57.0,
+    "steps": 1995.0,
+    "accepted": 7862.0,
+    "drafted": 29925.0,
+    "out_tok": 9807.0
+   },
+   "<2K|high": {
+    "calls": 26.0,
+    "steps": 2993.0,
+    "accepted": 7470.0,
+    "drafted": 44895.0,
+    "out_tok": 10436.0
+   },
+   "2-8K|high": {
+    "calls": 74.0,
+    "steps": 6600.0,
+    "accepted": 19020.0,
+    "drafted": 99000.0,
+    "out_tok": 25535.0
+   },
+   "2-8K|xhigh": {
+    "calls": 82.0,
+    "steps": 6514.0,
+    "accepted": 17616.0,
+    "drafted": 97710.0,
+    "out_tok": 24050.0
+   },
+   "8-16K|xhigh": {
+    "calls": 75.0,
+    "steps": 5704.0,
+    "accepted": 13424.0,
+    "drafted": 85560.0,
+    "out_tok": 19087.0
+   },
+   "2-8K|medium": {
+    "calls": 63.0,
+    "steps": 6766.0,
+    "accepted": 18555.0,
+    "drafted": 101490.0,
+    "out_tok": 25264.0
+   },
+   "8-16K|low": {
+    "calls": 45.0,
+    "steps": 1682.0,
+    "accepted": 6892.0,
+    "drafted": 25230.0,
+    "out_tok": 8535.0
+   },
+   "16-32K|low": {
+    "calls": 101.0,
+    "steps": 3477.0,
+    "accepted": 10939.0,
+    "drafted": 52155.0,
+    "out_tok": 14357.0
+   },
+   "8-16K|medium": {
+    "calls": 121.0,
+    "steps": 12254.0,
+    "accepted": 32875.0,
+    "drafted": 183810.0,
+    "out_tok": 45073.0
+   },
+   "8-16K|high": {
+    "calls": 88.0,
+    "steps": 11020.0,
+    "accepted": 27472.0,
+    "drafted": 165300.0,
+    "out_tok": 38441.0
+   },
+   "16-32K|xhigh": {
+    "calls": 201.0,
+    "steps": 12915.0,
+    "accepted": 35776.0,
+    "drafted": 193725.0,
+    "out_tok": 48571.0
+   },
+   "32-64K|low": {
+    "calls": 118.0,
+    "steps": 4585.0,
+    "accepted": 13183.0,
+    "drafted": 68775.0,
+    "out_tok": 17659.0
+   },
+   "16-32K|medium": {
+    "calls": 107.0,
+    "steps": 14336.0,
+    "accepted": 38642.0,
+    "drafted": 215040.0,
+    "out_tok": 52934.0
+   },
+   "32-64K|xhigh": {
+    "calls": 245.0,
+    "steps": 15682.0,
+    "accepted": 45367.0,
+    "drafted": 235230.0,
+    "out_tok": 60934.0
+   },
+   "32-64K|medium": {
+    "calls": 56.0,
+    "steps": 4700.0,
+    "accepted": 19460.0,
+    "drafted": 70500.0,
+    "out_tok": 24133.0
+   },
+   "16-32K|high": {
+    "calls": 98.0,
+    "steps": 12603.0,
+    "accepted": 34388.0,
+    "drafted": 189045.0,
+    "out_tok": 46943.0
+   },
+   "64K+|xhigh": {
+    "calls": 57.0,
+    "steps": 3780.0,
+    "accepted": 10612.0,
+    "drafted": 56700.0,
+    "out_tok": 14373.0
+   },
+   "32-64K|high": {
+    "calls": 39.0,
+    "steps": 2489.0,
+    "accepted": 8503.0,
+    "drafted": 37335.0,
+    "out_tok": 10981.0
+   }
+  },
+  "dflash2-repeat2": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 347.0,
+    "accepted": 1950.0,
+    "drafted": 5205.0,
+    "out_tok": 2295.0
+   },
+   "<2K|low": {
+    "calls": 26.0,
+    "steps": 906.0,
+    "accepted": 4198.0,
+    "drafted": 13590.0,
+    "out_tok": 5106.0
+   },
+   "<2K|xhigh": {
+    "calls": 25.0,
+    "steps": 699.0,
+    "accepted": 3595.0,
+    "drafted": 10485.0,
+    "out_tok": 4291.0
+   },
+   "2-8K|low": {
+    "calls": 57.0,
+    "steps": 1724.0,
+    "accepted": 7188.0,
+    "drafted": 25860.0,
+    "out_tok": 8921.0
+   },
+   "2-8K|xhigh": {
+    "calls": 86.0,
+    "steps": 4890.0,
+    "accepted": 13504.0,
+    "drafted": 73350.0,
+    "out_tok": 18398.0
+   },
+   "2-8K|medium": {
+    "calls": 63.0,
+    "steps": 5440.0,
+    "accepted": 15864.0,
+    "drafted": 81600.0,
+    "out_tok": 21309.0
+   },
+   "<2K|high": {
+    "calls": 26.0,
+    "steps": 4262.0,
+    "accepted": 9817.0,
+    "drafted": 63930.0,
+    "out_tok": 14081.0
+   },
+   "2-8K|high": {
+    "calls": 74.0,
+    "steps": 7841.0,
+    "accepted": 23792.0,
+    "drafted": 117615.0,
+    "out_tok": 31644.0
+   },
+   "8-16K|xhigh": {
+    "calls": 77.0,
+    "steps": 5792.0,
+    "accepted": 14874.0,
+    "drafted": 86880.0,
+    "out_tok": 20672.0
+   },
+   "8-16K|low": {
+    "calls": 46.0,
+    "steps": 1972.0,
+    "accepted": 7963.0,
+    "drafted": 29580.0,
+    "out_tok": 9939.0
+   },
+   "8-16K|medium": {
+    "calls": 121.0,
+    "steps": 10769.0,
+    "accepted": 30346.0,
+    "drafted": 161535.0,
+    "out_tok": 41128.0
+   },
+   "8-16K|high": {
+    "calls": 89.0,
+    "steps": 8738.0,
+    "accepted": 22580.0,
+    "drafted": 131070.0,
+    "out_tok": 31333.0
+   },
+   "16-32K|low": {
+    "calls": 101.0,
+    "steps": 3154.0,
+    "accepted": 10368.0,
+    "drafted": 47310.0,
+    "out_tok": 13537.0
+   },
+   "16-32K|xhigh": {
+    "calls": 202.0,
+    "steps": 13083.0,
+    "accepted": 35990.0,
+    "drafted": 196245.0,
+    "out_tok": 49101.0
+   },
+   "16-32K|medium": {
+    "calls": 108.0,
+    "steps": 11510.0,
+    "accepted": 34750.0,
+    "drafted": 172650.0,
+    "out_tok": 46285.0
+   },
+   "32-64K|low": {
+    "calls": 118.0,
+    "steps": 5125.0,
+    "accepted": 14959.0,
+    "drafted": 76875.0,
+    "out_tok": 20091.0
+   },
+   "32-64K|xhigh": {
+    "calls": 247.0,
+    "steps": 15567.0,
+    "accepted": 47915.0,
+    "drafted": 233505.0,
+    "out_tok": 63516.0
+   },
+   "32-64K|medium": {
+    "calls": 55.0,
+    "steps": 4018.0,
+    "accepted": 17907.0,
+    "drafted": 60270.0,
+    "out_tok": 21945.0
+   },
+   "16-32K|high": {
+    "calls": 101.0,
+    "steps": 10771.0,
+    "accepted": 30147.0,
+    "drafted": 161565.0,
+    "out_tok": 40936.0
+   },
+   "32-64K|high": {
+    "calls": 41.0,
+    "steps": 2787.0,
+    "accepted": 10566.0,
+    "drafted": 41805.0,
+    "out_tok": 13362.0
+   },
+   "64K+|xhigh": {
+    "calls": 56.0,
+    "steps": 2663.0,
+    "accepted": 8447.0,
+    "drafted": 39945.0,
+    "out_tok": 11113.0
+   }
+  },
+  "dflash2-run-d-32k-mix-step1976": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 1450.0,
+    "accepted": 4617.0,
+    "drafted": 21750.0,
+    "out_tok": 6029.0
+   },
+   "<2K|low": {
+    "calls": 26.0,
+    "steps": 855.0,
+    "accepted": 4083.0,
+    "drafted": 12825.0,
+    "out_tok": 4917.0
+   },
+   "<2K|xhigh": {
+    "calls": 26.0,
+    "steps": 552.0,
+    "accepted": 3838.0,
+    "drafted": 8280.0,
+    "out_tok": 4378.0
+   },
+   "2-8K|low": {
+    "calls": 56.0,
+    "steps": 2307.0,
+    "accepted": 8195.0,
+    "drafted": 34605.0,
+    "out_tok": 10472.0
+   },
+   "<2K|high": {
+    "calls": 26.0,
+    "steps": 2578.0,
+    "accepted": 6965.0,
+    "drafted": 38670.0,
+    "out_tok": 9508.0
+   },
+   "2-8K|medium": {
+    "calls": 62.0,
+    "steps": 10077.0,
+    "accepted": 25099.0,
+    "drafted": 151155.0,
+    "out_tok": 35146.0
+   },
+   "2-8K|high": {
+    "calls": 74.0,
+    "steps": 6129.0,
+    "accepted": 18563.0,
+    "drafted": 91935.0,
+    "out_tok": 24655.0
+   },
+   "2-8K|xhigh": {
+    "calls": 86.0,
+    "steps": 4510.0,
+    "accepted": 12993.0,
+    "drafted": 67650.0,
+    "out_tok": 17425.0
+   },
+   "8-16K|xhigh": {
+    "calls": 77.0,
+    "steps": 6176.0,
+    "accepted": 15390.0,
+    "drafted": 92640.0,
+    "out_tok": 21552.0
+   },
+   "8-16K|low": {
+    "calls": 45.0,
+    "steps": 1499.0,
+    "accepted": 6392.0,
+    "drafted": 22485.0,
+    "out_tok": 7880.0
+   },
+   "8-16K|medium": {
+    "calls": 121.0,
+    "steps": 10880.0,
+    "accepted": 29354.0,
+    "drafted": 163200.0,
+    "out_tok": 40189.0
+   },
+   "8-16K|high": {
+    "calls": 88.0,
+    "steps": 9328.0,
+    "accepted": 25158.0,
+    "drafted": 139920.0,
+    "out_tok": 34465.0
+   },
+   "16-32K|low": {
+    "calls": 100.0,
+    "steps": 3073.0,
+    "accepted": 10808.0,
+    "drafted": 46095.0,
+    "out_tok": 13868.0
+   },
+   "16-32K|xhigh": {
+    "calls": 201.0,
+    "steps": 17122.0,
+    "accepted": 44170.0,
+    "drafted": 256830.0,
+    "out_tok": 61229.0
+   },
+   "16-32K|medium": {
+    "calls": 107.0,
+    "steps": 10210.0,
+    "accepted": 31067.0,
+    "drafted": 153150.0,
+    "out_tok": 41237.0
+   },
+   "32-64K|xhigh": {
+    "calls": 249.0,
+    "steps": 16176.0,
+    "accepted": 46645.0,
+    "drafted": 242640.0,
+    "out_tok": 62757.0
+   },
+   "32-64K|low": {
+    "calls": 119.0,
+    "steps": 4408.0,
+    "accepted": 13858.0,
+    "drafted": 66120.0,
+    "out_tok": 18213.0
+   },
+   "32-64K|medium": {
+    "calls": 53.0,
+    "steps": 4813.0,
+    "accepted": 19407.0,
+    "drafted": 72195.0,
+    "out_tok": 24212.0
+   },
+   "16-32K|high": {
+    "calls": 100.0,
+    "steps": 11690.0,
+    "accepted": 30479.0,
+    "drafted": 175350.0,
+    "out_tok": 42148.0
+   },
+   "32-64K|high": {
+    "calls": 40.0,
+    "steps": 2862.0,
+    "accepted": 11590.0,
+    "drafted": 42930.0,
+    "out_tok": 14437.0
+   },
+   "64K+|xhigh": {
+    "calls": 57.0,
+    "steps": 3468.0,
+    "accepted": 9911.0,
+    "drafted": 52020.0,
+    "out_tok": 13366.0
+   }
+  },
+  "dflash2-run-d-32k-mix": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 19709.0,
+    "accepted": 45931.0,
+    "drafted": 295635.0,
+    "out_tok": 65606.0
+   },
+   "<2K|high": {
+    "calls": 26.0,
+    "steps": 3244.0,
+    "accepted": 8332.0,
+    "drafted": 48660.0,
+    "out_tok": 11551.0
+   },
+   "<2K|xhigh": {
+    "calls": 26.0,
+    "steps": 676.0,
+    "accepted": 3414.0,
+    "drafted": 10140.0,
+    "out_tok": 4084.0
+   },
+   "<2K|low": {
+    "calls": 24.0,
+    "steps": 815.0,
+    "accepted": 4008.0,
+    "drafted": 12225.0,
+    "out_tok": 4803.0
+   },
+   "2-8K|high": {
+    "calls": 73.0,
+    "steps": 6382.0,
+    "accepted": 21012.0,
+    "drafted": 95730.0,
+    "out_tok": 27347.0
+   },
+   "2-8K|low": {
+    "calls": 55.0,
+    "steps": 1862.0,
+    "accepted": 7367.0,
+    "drafted": 27930.0,
+    "out_tok": 9198.0
+   },
+   "2-8K|xhigh": {
+    "calls": 82.0,
+    "steps": 5716.0,
+    "accepted": 15378.0,
+    "drafted": 85740.0,
+    "out_tok": 21048.0
+   },
+   "2-8K|medium": {
+    "calls": 63.0,
+    "steps": 7513.0,
+    "accepted": 19066.0,
+    "drafted": 112695.0,
+    "out_tok": 26550.0
+   },
+   "8-16K|xhigh": {
+    "calls": 76.0,
+    "steps": 6127.0,
+    "accepted": 15416.0,
+    "drafted": 91905.0,
+    "out_tok": 21534.0
+   },
+   "8-16K|low": {
+    "calls": 45.0,
+    "steps": 1500.0,
+    "accepted": 6246.0,
+    "drafted": 22500.0,
+    "out_tok": 7724.0
+   },
+   "8-16K|medium": {
+    "calls": 120.0,
+    "steps": 13398.0,
+    "accepted": 32595.0,
+    "drafted": 200970.0,
+    "out_tok": 45951.0
+   },
+   "16-32K|low": {
+    "calls": 98.0,
+    "steps": 2984.0,
+    "accepted": 10211.0,
+    "drafted": 44760.0,
+    "out_tok": 13146.0
+   },
+   "8-16K|high": {
+    "calls": 84.0,
+    "steps": 7888.0,
+    "accepted": 21753.0,
+    "drafted": 118320.0,
+    "out_tok": 29612.0
+   },
+   "16-32K|xhigh": {
+    "calls": 204.0,
+    "steps": 13553.0,
+    "accepted": 37164.0,
+    "drafted": 203295.0,
+    "out_tok": 50639.0
+   },
+   "16-32K|medium": {
+    "calls": 109.0,
+    "steps": 11170.0,
+    "accepted": 34012.0,
+    "drafted": 167550.0,
+    "out_tok": 45158.0
+   },
+   "32-64K|low": {
+    "calls": 118.0,
+    "steps": 4198.0,
+    "accepted": 13936.0,
+    "drafted": 62970.0,
+    "out_tok": 18080.0
+   },
+   "32-64K|xhigh": {
+    "calls": 245.0,
+    "steps": 16085.0,
+    "accepted": 48206.0,
+    "drafted": 241275.0,
+    "out_tok": 64258.0
+   },
+   "32-64K|medium": {
+    "calls": 49.0,
+    "steps": 3588.0,
+    "accepted": 16042.0,
+    "drafted": 53820.0,
+    "out_tok": 19617.0
+   },
+   "16-32K|high": {
+    "calls": 98.0,
+    "steps": 11807.0,
+    "accepted": 31645.0,
+    "drafted": 177105.0,
+    "out_tok": 43418.0
+   },
+   "32-64K|high": {
+    "calls": 41.0,
+    "steps": 2020.0,
+    "accepted": 8224.0,
+    "drafted": 30300.0,
+    "out_tok": 10226.0
+   },
+   "64K+|xhigh": {
+    "calls": 54.0,
+    "steps": 3714.0,
+    "accepted": 10834.0,
+    "drafted": 55710.0,
+    "out_tok": 14525.0
+   }
+  },
+  "dflash2-run-d-step1976-scalefix": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 12105.0,
+    "accepted": 25185.0,
+    "drafted": 181575.0,
+    "out_tok": 37244.0
+   },
+   "<2K|xhigh": {
+    "calls": 26.0,
+    "steps": 883.0,
+    "accepted": 4627.0,
+    "drafted": 13245.0,
+    "out_tok": 5490.0
+   },
+   "<2K|low": {
+    "calls": 25.0,
+    "steps": 811.0,
+    "accepted": 3833.0,
+    "drafted": 12165.0,
+    "out_tok": 4610.0
+   },
+   "<2K|high": {
+    "calls": 25.0,
+    "steps": 1066.0,
+    "accepted": 4065.0,
+    "drafted": 15990.0,
+    "out_tok": 5071.0
+   },
+   "2-8K|xhigh": {
+    "calls": 86.0,
+    "steps": 5787.0,
+    "accepted": 16503.0,
+    "drafted": 86805.0,
+    "out_tok": 22201.0
+   },
+   "2-8K|low": {
+    "calls": 54.0,
+    "steps": 2101.0,
+    "accepted": 7915.0,
+    "drafted": 31515.0,
+    "out_tok": 9956.0
+   },
+   "2-8K|high": {
+    "calls": 73.0,
+    "steps": 4898.0,
+    "accepted": 17570.0,
+    "drafted": 73470.0,
+    "out_tok": 22374.0
+   },
+   "2-8K|medium": {
+    "calls": 62.0,
+    "steps": 8473.0,
+    "accepted": 21814.0,
+    "drafted": 127095.0,
+    "out_tok": 30213.0
+   },
+   "8-16K|xhigh": {
+    "calls": 75.0,
+    "steps": 5397.0,
+    "accepted": 13697.0,
+    "drafted": 80955.0,
+    "out_tok": 19004.0
+   },
+   "8-16K|medium": {
+    "calls": 120.0,
+    "steps": 9209.0,
+    "accepted": 25928.0,
+    "drafted": 138135.0,
+    "out_tok": 35011.0
+   },
+   "8-16K|low": {
+    "calls": 46.0,
+    "steps": 1834.0,
+    "accepted": 7201.0,
+    "drafted": 27510.0,
+    "out_tok": 8999.0
+   },
+   "16-32K|low": {
+    "calls": 98.0,
+    "steps": 3621.0,
+    "accepted": 11068.0,
+    "drafted": 54315.0,
+    "out_tok": 14632.0
+   },
+   "16-32K|xhigh": {
+    "calls": 203.0,
+    "steps": 15788.0,
+    "accepted": 42823.0,
+    "drafted": 236820.0,
+    "out_tok": 58423.0
+   },
+   "16-32K|medium": {
+    "calls": 105.0,
+    "steps": 9509.0,
+    "accepted": 30117.0,
+    "drafted": 142635.0,
+    "out_tok": 39533.0
+   },
+   "8-16K|high": {
+    "calls": 85.0,
+    "steps": 6135.0,
+    "accepted": 17986.0,
+    "drafted": 92025.0,
+    "out_tok": 24037.0
+   },
+   "32-64K|xhigh": {
+    "calls": 230.0,
+    "steps": 15214.0,
+    "accepted": 45439.0,
+    "drafted": 228210.0,
+    "out_tok": 60509.0
+   },
+   "32-64K|low": {
+    "calls": 120.0,
+    "steps": 4004.0,
+    "accepted": 13521.0,
+    "drafted": 60060.0,
+    "out_tok": 17430.0
+   },
+   "32-64K|medium": {
+    "calls": 49.0,
+    "steps": 3351.0,
+    "accepted": 15014.0,
+    "drafted": 50265.0,
+    "out_tok": 18324.0
+   },
+   "16-32K|high": {
+    "calls": 101.0,
+    "steps": 10830.0,
+    "accepted": 29922.0,
+    "drafted": 162450.0,
+    "out_tok": 40674.0
+   },
+   "32-64K|high": {
+    "calls": 41.0,
+    "steps": 2592.0,
+    "accepted": 10122.0,
+    "drafted": 38880.0,
+    "out_tok": 12661.0
+   },
+   "64K+|xhigh": {
+    "calls": 47.0,
+    "steps": 2928.0,
+    "accepted": 8754.0,
+    "drafted": 43920.0,
+    "out_tok": 11652.0
+   }
+  },
+  "dflash2": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 3956.0,
+    "accepted": 8893.0,
+    "drafted": 59340.0,
+    "out_tok": 12846.0
+   },
+   "<2K|xhigh": {
+    "calls": 26.0,
+    "steps": 789.0,
+    "accepted": 3527.0,
+    "drafted": 11835.0,
+    "out_tok": 4319.0
+   },
+   "<2K|low": {
+    "calls": 26.0,
+    "steps": 1067.0,
+    "accepted": 4804.0,
+    "drafted": 16005.0,
+    "out_tok": 5868.0
+   },
+   "2-8K|low": {
+    "calls": 56.0,
+    "steps": 1881.0,
+    "accepted": 7421.0,
+    "drafted": 28215.0,
+    "out_tok": 9306.0
+   },
+   "2-8K|xhigh": {
+    "calls": 86.0,
+    "steps": 4588.0,
+    "accepted": 14000.0,
+    "drafted": 68820.0,
+    "out_tok": 18595.0
+   },
+   "2-8K|medium": {
+    "calls": 63.0,
+    "steps": 3977.0,
+    "accepted": 12336.0,
+    "drafted": 59655.0,
+    "out_tok": 16319.0
+   },
+   "8-16K|xhigh": {
+    "calls": 76.0,
+    "steps": 6144.0,
+    "accepted": 16337.0,
+    "drafted": 92160.0,
+    "out_tok": 22490.0
+   },
+   "<2K|high": {
+    "calls": 26.0,
+    "steps": 6389.0,
+    "accepted": 14444.0,
+    "drafted": 95835.0,
+    "out_tok": 20834.0
+   },
+   "8-16K|low": {
+    "calls": 44.0,
+    "steps": 1621.0,
+    "accepted": 6746.0,
+    "drafted": 24315.0,
+    "out_tok": 8372.0
+   },
+   "2-8K|high": {
+    "calls": 74.0,
+    "steps": 6836.0,
+    "accepted": 22868.0,
+    "drafted": 102540.0,
+    "out_tok": 29717.0
+   },
+   "16-32K|low": {
+    "calls": 100.0,
+    "steps": 2965.0,
+    "accepted": 10430.0,
+    "drafted": 44475.0,
+    "out_tok": 13412.0
+   },
+   "8-16K|medium": {
+    "calls": 120.0,
+    "steps": 8872.0,
+    "accepted": 24702.0,
+    "drafted": 133080.0,
+    "out_tok": 33588.0
+   },
+   "16-32K|xhigh": {
+    "calls": 204.0,
+    "steps": 15645.0,
+    "accepted": 42644.0,
+    "drafted": 234675.0,
+    "out_tok": 58305.0
+   },
+   "8-16K|high": {
+    "calls": 87.0,
+    "steps": 9305.0,
+    "accepted": 24359.0,
+    "drafted": 139575.0,
+    "out_tok": 33677.0
+   },
+   "16-32K|medium": {
+    "calls": 108.0,
+    "steps": 10510.0,
+    "accepted": 32694.0,
+    "drafted": 157650.0,
+    "out_tok": 43227.0
+   },
+   "32-64K|xhigh": {
+    "calls": 248.0,
+    "steps": 16821.0,
+    "accepted": 49228.0,
+    "drafted": 252315.0,
+    "out_tok": 66085.0
+   },
+   "32-64K|low": {
+    "calls": 119.0,
+    "steps": 4168.0,
+    "accepted": 13347.0,
+    "drafted": 62520.0,
+    "out_tok": 17523.0
+   },
+   "32-64K|medium": {
+    "calls": 56.0,
+    "steps": 4179.0,
+    "accepted": 18013.0,
+    "drafted": 62685.0,
+    "out_tok": 22204.0
+   },
+   "16-32K|high": {
+    "calls": 102.0,
+    "steps": 10865.0,
+    "accepted": 31306.0,
+    "drafted": 162975.0,
+    "out_tok": 42184.0
+   },
+   "32-64K|high": {
+    "calls": 41.0,
+    "steps": 2561.0,
+    "accepted": 11445.0,
+    "drafted": 38415.0,
+    "out_tok": 14015.0
+   },
+   "64K+|xhigh": {
+    "calls": 56.0,
+    "steps": 2973.0,
+    "accepted": 9043.0,
+    "drafted": 44595.0,
+    "out_tok": 12020.0
+   }
+  },
+  "dspark-community": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 1982.0,
+    "accepted": 4447.0,
+    "drafted": 29730.0,
+    "out_tok": 6407.0
+   },
+   "<2K|low": {
+    "calls": 26.0,
+    "steps": 1239.0,
+    "accepted": 4394.0,
+    "drafted": 18585.0,
+    "out_tok": 5594.0
+   },
+   "<2K|xhigh": {
+    "calls": 26.0,
+    "steps": 909.0,
+    "accepted": 3692.0,
+    "drafted": 13635.0,
+    "out_tok": 4561.0
+   },
+   "<2K|high": {
+    "calls": 24.0,
+    "steps": 7610.0,
+    "accepted": 15417.0,
+    "drafted": 114150.0,
+    "out_tok": 22995.0
+   },
+   "2-8K|low": {
+    "calls": 57.0,
+    "steps": 2700.0,
+    "accepted": 7208.0,
+    "drafted": 40500.0,
+    "out_tok": 9925.0
+   },
+   "2-8K|high": {
+    "calls": 74.0,
+    "steps": 6195.0,
+    "accepted": 16135.0,
+    "drafted": 92925.0,
+    "out_tok": 22373.0
+   },
+   "2-8K|medium": {
+    "calls": 62.0,
+    "steps": 6748.0,
+    "accepted": 13763.0,
+    "drafted": 101220.0,
+    "out_tok": 20552.0
+   },
+   "2-8K|xhigh": {
+    "calls": 86.0,
+    "steps": 6191.0,
+    "accepted": 13793.0,
+    "drafted": 92865.0,
+    "out_tok": 20037.0
+   },
+   "8-16K|xhigh": {
+    "calls": 77.0,
+    "steps": 6610.0,
+    "accepted": 12181.0,
+    "drafted": 99150.0,
+    "out_tok": 18846.0
+   },
+   "8-16K|low": {
+    "calls": 45.0,
+    "steps": 2296.0,
+    "accepted": 6417.0,
+    "drafted": 34440.0,
+    "out_tok": 8736.0
+   },
+   "8-16K|high": {
+    "calls": 89.0,
+    "steps": 12674.0,
+    "accepted": 24399.0,
+    "drafted": 190110.0,
+    "out_tok": 37156.0
+   },
+   "8-16K|medium": {
+    "calls": 120.0,
+    "steps": 11936.0,
+    "accepted": 26832.0,
+    "drafted": 179040.0,
+    "out_tok": 38887.0
+   },
+   "16-32K|low": {
+    "calls": 100.0,
+    "steps": 4480.0,
+    "accepted": 9188.0,
+    "drafted": 67200.0,
+    "out_tok": 13750.0
+   },
+   "16-32K|xhigh": {
+    "calls": 203.0,
+    "steps": 19941.0,
+    "accepted": 39971.0,
+    "drafted": 299115.0,
+    "out_tok": 60086.0
+   },
+   "16-32K|medium": {
+    "calls": 110.0,
+    "steps": 12397.0,
+    "accepted": 28355.0,
+    "drafted": 185955.0,
+    "out_tok": 40849.0
+   },
+   "32-64K|xhigh": {
+    "calls": 248.0,
+    "steps": 22386.0,
+    "accepted": 45057.0,
+    "drafted": 335790.0,
+    "out_tok": 67678.0
+   },
+   "32-64K|low": {
+    "calls": 119.0,
+    "steps": 6032.0,
+    "accepted": 11230.0,
+    "drafted": 90480.0,
+    "out_tok": 17376.0
+   },
+   "32-64K|medium": {
+    "calls": 53.0,
+    "steps": 5242.0,
+    "accepted": 15788.0,
+    "drafted": 78630.0,
+    "out_tok": 21059.0
+   },
+   "16-32K|high": {
+    "calls": 103.0,
+    "steps": 11057.0,
+    "accepted": 24530.0,
+    "drafted": 165855.0,
+    "out_tok": 35683.0
+   },
+   "32-64K|high": {
+    "calls": 41.0,
+    "steps": 5512.0,
+    "accepted": 15026.0,
+    "drafted": 82680.0,
+    "out_tok": 20569.0
+   },
+   "64K+|xhigh": {
+    "calls": 57.0,
+    "steps": 4265.0,
+    "accepted": 8337.0,
+    "drafted": 63975.0,
+    "out_tok": 12654.0
+   }
+  },
+  "dspark-run-a-32k": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 895.0,
+    "accepted": 3421.0,
+    "drafted": 13425.0,
+    "out_tok": 4253.0
+   },
+   "<2K|xhigh": {
+    "calls": 26.0,
+    "steps": 795.0,
+    "accepted": 3846.0,
+    "drafted": 11925.0,
+    "out_tok": 4587.0
+   },
+   "<2K|low": {
+    "calls": 26.0,
+    "steps": 662.0,
+    "accepted": 3528.0,
+    "drafted": 9930.0,
+    "out_tok": 4119.0
+   },
+   "2-8K|xhigh": {
+    "calls": 85.0,
+    "steps": 5697.0,
+    "accepted": 14672.0,
+    "drafted": 85455.0,
+    "out_tok": 20138.0
+   },
+   "<2K|high": {
+    "calls": 25.0,
+    "steps": 2354.0,
+    "accepted": 6292.0,
+    "drafted": 35310.0,
+    "out_tok": 8589.0
+   },
+   "2-8K|low": {
+    "calls": 57.0,
+    "steps": 2110.0,
+    "accepted": 7798.0,
+    "drafted": 31650.0,
+    "out_tok": 9772.0
+   },
+   "2-8K|medium": {
+    "calls": 63.0,
+    "steps": 8021.0,
+    "accepted": 20502.0,
+    "drafted": 120315.0,
+    "out_tok": 28382.0
+   },
+   "2-8K|high": {
+    "calls": 72.0,
+    "steps": 5232.0,
+    "accepted": 15420.0,
+    "drafted": 78480.0,
+    "out_tok": 20461.0
+   },
+   "8-16K|xhigh": {
+    "calls": 76.0,
+    "steps": 7273.0,
+    "accepted": 16677.0,
+    "drafted": 109095.0,
+    "out_tok": 23803.0
+   },
+   "8-16K|low": {
+    "calls": 45.0,
+    "steps": 1877.0,
+    "accepted": 6897.0,
+    "drafted": 28155.0,
+    "out_tok": 8686.0
+   },
+   "8-16K|medium": {
+    "calls": 119.0,
+    "steps": 10245.0,
+    "accepted": 26672.0,
+    "drafted": 153675.0,
+    "out_tok": 36691.0
+   },
+   "16-32K|low": {
+    "calls": 100.0,
+    "steps": 3195.0,
+    "accepted": 11190.0,
+    "drafted": 47925.0,
+    "out_tok": 14154.0
+   },
+   "16-32K|medium": {
+    "calls": 109.0,
+    "steps": 11468.0,
+    "accepted": 33721.0,
+    "drafted": 172020.0,
+    "out_tok": 44965.0
+   },
+   "16-32K|xhigh": {
+    "calls": 200.0,
+    "steps": 14863.0,
+    "accepted": 37439.0,
+    "drafted": 222945.0,
+    "out_tok": 51870.0
+   },
+   "8-16K|high": {
+    "calls": 88.0,
+    "steps": 8946.0,
+    "accepted": 23731.0,
+    "drafted": 134190.0,
+    "out_tok": 32499.0
+   },
+   "32-64K|low": {
+    "calls": 120.0,
+    "steps": 5127.0,
+    "accepted": 15395.0,
+    "drafted": 76905.0,
+    "out_tok": 20231.0
+   },
+   "32-64K|xhigh": {
+    "calls": 246.0,
+    "steps": 15896.0,
+    "accepted": 44128.0,
+    "drafted": 238440.0,
+    "out_tok": 59544.0
+   },
+   "32-64K|medium": {
+    "calls": 55.0,
+    "steps": 3621.0,
+    "accepted": 15867.0,
+    "drafted": 54315.0,
+    "out_tok": 19363.0
+   },
+   "16-32K|high": {
+    "calls": 103.0,
+    "steps": 14536.0,
+    "accepted": 34926.0,
+    "drafted": 218040.0,
+    "out_tok": 49260.0
+   },
+   "32-64K|high": {
+    "calls": 40.0,
+    "steps": 2256.0,
+    "accepted": 9576.0,
+    "drafted": 33840.0,
+    "out_tok": 11718.0
+   },
+   "64K+|xhigh": {
+    "calls": 57.0,
+    "steps": 4478.0,
+    "accepted": 11551.0,
+    "drafted": 67170.0,
+    "out_tok": 15935.0
+   }
+  },
+  "dspark-run-b-49k": {
+   "<2K|medium": {
+    "calls": 19.0,
+    "steps": 2629.0,
+    "accepted": 5986.0,
+    "drafted": 39435.0,
+    "out_tok": 8558.0
+   },
+   "<2K|low": {
+    "calls": 25.0,
+    "steps": 902.0,
+    "accepted": 3966.0,
+    "drafted": 13530.0,
+    "out_tok": 4802.0
+   },
+   "<2K|high": {
+    "calls": 25.0,
+    "steps": 3517.0,
+    "accepted": 8043.0,
+    "drafted": 52755.0,
+    "out_tok": 11496.0
+   },
+   "<2K|xhigh": {
+    "calls": 26.0,
+    "steps": 721.0,
+    "accepted": 3623.0,
+    "drafted": 10815.0,
+    "out_tok": 4303.0
+   },
+   "2-8K|low": {
+    "calls": 56.0,
+    "steps": 2294.0,
+    "accepted": 7838.0,
+    "drafted": 34410.0,
+    "out_tok": 9996.0
+   },
+   "2-8K|high": {
+    "calls": 73.0,
+    "steps": 6181.0,
+    "accepted": 17951.0,
+    "drafted": 92715.0,
+    "out_tok": 23953.0
+   },
+   "2-8K|medium": {
+    "calls": 63.0,
+    "steps": 6218.0,
+    "accepted": 15995.0,
+    "drafted": 93270.0,
+    "out_tok": 22074.0
+   },
+   "2-8K|xhigh": {
+    "calls": 86.0,
+    "steps": 7633.0,
+    "accepted": 19331.0,
+    "drafted": 114495.0,
+    "out_tok": 26789.0
+   },
+   "8-16K|xhigh": {
+    "calls": 73.0,
+    "steps": 6207.0,
+    "accepted": 14281.0,
+    "drafted": 93105.0,
+    "out_tok": 20320.0
+   },
+   "8-16K|low": {
+    "calls": 46.0,
+    "steps": 1940.0,
+    "accepted": 6869.0,
+    "drafted": 29100.0,
+    "out_tok": 8684.0
+   },
+   "8-16K|medium": {
+    "calls": 121.0,
+    "steps": 10008.0,
+    "accepted": 25821.0,
+    "drafted": 150120.0,
+    "out_tok": 35532.0
+   },
+   "16-32K|low": {
+    "calls": 101.0,
+    "steps": 2722.0,
+    "accepted": 9461.0,
+    "drafted": 40830.0,
+    "out_tok": 11962.0
+   },
+   "8-16K|high": {
+    "calls": 87.0,
+    "steps": 10353.0,
+    "accepted": 24021.0,
+    "drafted": 155295.0,
+    "out_tok": 34172.0
+   },
+   "16-32K|xhigh": {
+    "calls": 204.0,
+    "steps": 13763.0,
+    "accepted": 36463.0,
+    "drafted": 206445.0,
+    "out_tok": 49807.0
+   },
+   "16-32K|medium": {
+    "calls": 109.0,
+    "steps": 11447.0,
+    "accepted": 30697.0,
+    "drafted": 171705.0,
+    "out_tok": 41919.0
+   },
+   "32-64K|low": {
+    "calls": 118.0,
+    "steps": 4968.0,
+    "accepted": 14741.0,
+    "drafted": 74520.0,
+    "out_tok": 19461.0
+   },
+   "32-64K|xhigh": {
+    "calls": 247.0,
+    "steps": 15558.0,
+    "accepted": 45104.0,
+    "drafted": 233370.0,
+    "out_tok": 60117.0
+   },
+   "32-64K|medium": {
+    "calls": 55.0,
+    "steps": 3626.0,
+    "accepted": 15791.0,
+    "drafted": 54390.0,
+    "out_tok": 19281.0
+   },
+   "16-32K|high": {
+    "calls": 102.0,
+    "steps": 12054.0,
+    "accepted": 31063.0,
+    "drafted": 180810.0,
+    "out_tok": 42914.0
+   },
+   "32-64K|high": {
+    "calls": 41.0,
+    "steps": 2756.0,
+    "accepted": 10948.0,
+    "drafted": 41340.0,
+    "out_tok": 13581.0
+   },
+   "64K+|xhigh": {
+    "calls": 56.0,
+    "steps": 3270.0,
+    "accepted": 9547.0,
+    "drafted": 49050.0,
+    "out_tok": 12670.0
+   }
+  }
+ }
+}
