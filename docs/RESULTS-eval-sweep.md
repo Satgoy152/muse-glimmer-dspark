@@ -232,7 +232,225 @@ own preconditions are in the container log:
 
 ## Task 1 — Terminal-Bench bucket x concurrency sweep
 
-*pending — cells are still running.*
+**Complete.** 142 cells: 8 drafters x 4 buckets x 4 concurrencies, plus the
+`dflash2` repeat control at concurrencies 1 and 32, plus task 3's six full-set
+replays. **Zero errored calls across all 142 cells.** Greedy, `NUM_SPEC_TOKENS`
+15, one server per drafter, every server-side number an after-minus-before
+delta. 4 h 44 min of GPU.
+
+### The headline: speculation's advantage collapses with concurrency
+
+**Decode throughput over the no-spec control (x), greedy**
+
+| drafter | bucket | c1 | c2 | c8 | c32 |
+|---|---|---|---|---|---|
+| `dflash-official` | 64-128 | 4.40x | 3.94x | 3.61x | 1.80x |
+| `dflash-official` | 128-256 | 3.85x | 3.55x | 3.19x | 1.76x |
+| `dflash-official` | 256-1K | 4.04x | 3.82x | 3.33x | 1.91x |
+| `dflash-official` | >=1K | 3.46x | 3.44x | 2.89x | 2.38x |
+| `dflash2` | 64-128 | 4.41x | 4.26x | 3.53x | 1.80x |
+| `dflash2` | 128-256 | 3.81x | 3.76x | 3.31x | 1.79x |
+| `dflash2` | 256-1K | 4.10x | 4.00x | 3.49x | 1.97x |
+| `dflash2` | >=1K | 3.34x | 3.96x | 3.15x | 2.56x |
+| `dflash2-run-d-mid` | 64-128 | 4.71x | 4.53x | 3.82x | 1.95x |
+| `dflash2-run-d-mid` | 128-256 | 3.89x | 3.78x | 3.22x | 1.79x |
+| `dflash2-run-d-mid` | 256-1K | 3.76x | 3.75x | 3.29x | 2.19x |
+| `dflash2-run-d-mid` | >=1K | 3.45x | 3.12x | 2.89x | 2.47x |
+| `dflash2-run-d-final` | 64-128 | 4.90x | 4.67x | 3.88x | 1.96x |
+| `dflash2-run-d-final` | 128-256 | 3.94x | 3.72x | 3.40x | 1.85x |
+| `dflash2-run-d-final` | 256-1K | 4.05x | 3.76x | 3.37x | 1.90x |
+| `dflash2-run-d-final` | >=1K | 3.25x | 3.15x | 2.97x | 2.44x |
+| `dspark-community` | 64-128 | 3.02x | 2.81x | 2.54x | 1.22x |
+| `dspark-community` | 128-256 | 2.91x | 2.83x | 2.44x | 1.38x |
+| `dspark-community` | 256-1K | 3.28x | 3.12x | 2.74x | 1.60x |
+| `dspark-community` | >=1K | 2.89x | 2.91x | 2.62x | 2.09x |
+| `dspark-run-a-32k` | 64-128 | 4.45x | 3.96x | 3.61x | 1.86x |
+| `dspark-run-a-32k` | 128-256 | 3.55x | 3.43x | 3.01x | 1.72x |
+| `dspark-run-a-32k` | 256-1K | 3.73x | 3.58x | 3.09x | 1.77x |
+| `dspark-run-a-32k` | >=1K | 3.01x | 2.81x | 2.59x | 2.16x |
+| `dspark-run-b-49k` | 64-128 | 4.34x | 3.89x | 3.61x | 1.86x |
+| `dspark-run-b-49k` | 128-256 | 3.56x | 3.36x | 3.01x | 1.75x |
+| `dspark-run-b-49k` | 256-1K | 3.88x | 3.47x | 3.05x | 1.79x |
+| `dspark-run-b-49k` | >=1K | 2.94x | 2.89x | 2.67x | 2.10x |
+
+Every drafter loses roughly half its advantage between concurrency 1 and 32.
+This is new — `docs/RESULTS-paired.md` only had concurrency 1, where the
+3.15x-3.47x figures it quotes are reproduced here.
+
+**Acceptance is not what changes.** It is nearly flat in concurrency: `dflash2`
+in the `64-128` bucket scores 5.346 / 5.343 / 5.326 / 5.379 at concurrency
+1 / 2 / 8 / 32. Acceptance is a property of the drafter and the prompt, and the
+batch does not touch it.
+
+What changes is the cost of a step:
+
+**`t_step` (ms), pooled over the four buckets, with the per-bucket spread**
+
+| drafter | c1 | c2 | c8 | c32 |
+|---|---|---|---|---|
+| `nospec` | 16.13 (±0.1%) | 16.26 (±0.3%) | 16.75 (±1.2%) | 17.86 (±7.7%) |
+| `dflash-official` | 19.00 (±0.7%) | 20.01 (±9.1%) | 23.05 (±12.5%) | 40.33 (±61.9%) |
+| `dflash2` | 19.35 (±0.4%) | 19.93 (±1.8%) | 23.27 (±14.0%) | 40.33 (±67.6%) |
+| `dflash2-run-d-mid` | 19.33 (±0.5%) | 19.97 (±1.0%) | 23.39 (±13.3%) | 38.82 (±66.8%) |
+| `dflash2-run-d-final` | 19.36 (±0.4%) | 19.89 (±1.4%) | 23.44 (±12.8%) | 41.44 (±56.4%) |
+| `dspark-community` | 19.66 (±0.5%) | 20.52 (±6.2%) | 24.13 (±6.4%) | 41.77 (±62.8%) |
+| `dspark-run-a-32k` | 19.67 (±0.7%) | 20.66 (±6.9%) | 23.59 (±13.1%) | 40.31 (±62.8%) |
+| `dspark-run-b-49k` | 19.67 (±0.7%) | 20.67 (±9.1%) | 23.66 (±12.3%) | 39.04 (±60.6%) |
+
+The no-spec target step grows 16.13 -> 17.86 ms from concurrency 1 to 32, about
+11%. Every speculative step grows 19.0-19.7 -> ~40 ms, more than twice. A
+speculative step verifies `NUM_SPEC_TOKENS + 1` positions per sequence instead
+of one, so at batch 32 it is asking the target for ~16x more positions per
+iteration, and that lands on a GPU that is no longer memory-bound. The drafter
+that was nearly free at batch 1 is not free at batch 32.
+
+Subtracting the no-spec step at concurrency 1 gives each family's drafter cost:
+**+2.87 ms for DFlash, +3.22 ms for DFlash2, +3.54 ms for DSpark**, against
++3.02 / +3.35 / +3.65 in `docs/RESULTS-paired.md`. That reproduces on a
+different workload, under greedy rather than temperature 1.0, to within 0.15 ms.
+
+**The `t_step` spread column is a warning, not a feature.** At concurrency 1 the
+four buckets agree to 0.1-0.7%, which is the workload-independence
+`RESULTS-paired.md` relies on. At concurrency 32 they disagree by 56-68%,
+because the `>=1K` manifest holds 20 calls over **20 trajectories** and
+`replay.py` runs one worker per trajectory — that cell cannot reach concurrency
+32 and in practice runs far below it. `dflash2`'s `t_step` by bucket at
+concurrency 32 is 54.85 / 47.79 / 46.04 / **27.57** ms. So the `>=1K` row of the
+speedup table at concurrencies 8 and 32 is measuring a smaller batch than its
+label claims, and its higher apparent speedup there is that shortfall, **not**
+long generations holding up better under load. Do not read it as the latter.
+
+### Acceptance by output-length bucket
+
+Bucketed on the **original recording's** `completion_tokens`, so nothing selects
+on the replayed outcome.
+
+**Acceptance length, step-weighted — greedy, concurrency 1**
+
+| drafter | 64-128 | 128-256 | 256-1K | >=1K | reweighted to the full mix |
+|---|---|---|---|---|---|
+| `dflash-official` | 5.306 | 4.571 | 4.766 | 4.071 | 4.561 |
+| `dflash2` | 5.346 | 4.590 | 4.932 | 4.003 | 4.611 |
+| `dflash2-run-d-mid` | 5.782 | 4.703 | 4.530 | 4.132 | 4.561 |
+| `dflash2-run-d-final` | 6.019 | 4.768 | 4.889 | 3.896 | 4.659 |
+| `dspark-community` | 3.719 | 3.563 | 4.006 | 3.516 | 3.743 |
+| `dspark-run-a-32k` | 5.650 | 4.402 | 4.589 | 3.667 | 4.367 |
+| `dspark-run-b-49k` | 5.486 | 4.416 | 4.765 | 3.587 | 4.392 |
+
+**Acceptance length, per-request — greedy, concurrency 1**
+
+| drafter | 64-128 | 128-256 | 256-1K | >=1K | reweighted to the full mix |
+|---|---|---|---|---|---|
+| `dflash-official` | 7.012 | 5.668 | 6.029 | 4.575 | 5.589 |
+| `dflash2` | 6.770 | 5.688 | 6.172 | 4.834 | 5.711 |
+| `dflash2-run-d-mid` | 8.074 | 6.150 | 6.276 | 4.767 | 5.943 |
+| `dflash2-run-d-final` | 8.164 | 6.227 | 6.287 | 4.763 | 5.967 |
+| `dspark-community` | 4.164 | 3.832 | 4.770 | 3.950 | 4.290 |
+| `dspark-run-a-32k` | 7.828 | 5.705 | 6.014 | 4.269 | 5.577 |
+| `dspark-run-b-49k` | 7.783 | 5.720 | 5.950 | 4.306 | 5.561 |
+
+The `reweighted` column weights each bucket by that bucket's share of output
+tokens in the full 1,753-call recording, because the per-bucket sample sizes
+(160/120/60/20) were chosen to fit a time budget and pooling them raw would
+report the budget rather than the workload. It excludes the 171 calls under 64
+recorded tokens, which are in no bucket, and it uses recorded token shares while
+the replay generated its own — so treat it as an approximate full-mix number,
+not as a measurement of the full set.
+
+### Paired against `dflash2`, with the repeat control
+
+Concurrency 1, paired on `replay_of`, 2,000-resample bootstrap. The last row of
+each block is the same drafter replayed twice — the only honest yardstick at
+these sample sizes.
+
+```
+== output bucket 128-256, concurrency 1 -- A vs dflash2 (greedy) ==
+A                            n     sw A     sw B  sw delta                95% CI  per-req delta    win   tied
+dflash-official            120    4.571    4.590    -0.019      [-0.256, +0.222]  -0.021+-0.166    46%     5%
+dflash2-run-d-final        120    4.768    4.590    +0.178      [-0.007, +0.413]  +0.539+-0.199    67%     3%
+dflash2-run-d-mid          120    4.703    4.590    +0.113      [-0.056, +0.301]  +0.462+-0.188    66%     4%
+dspark-community           120    3.563    4.590    -1.027      [-1.259, -0.841]  -1.856+-0.252     1%     0%
+dspark-run-a-32k           120    4.402    4.590    -0.188      [-0.411, +0.040]  +0.016+-0.186    41%     1%
+dspark-run-b-49k           120    4.416    4.590    -0.174      [-0.377, +0.037]  +0.031+-0.196    45%     1%
+*control* dflash2 r2       120    4.610    4.590    +0.020      [-0.077, +0.128]  -0.012+-0.050    47%    73%
+
+== output bucket 256-1K, concurrency 1 -- A vs dflash2 (greedy) ==
+A                            n     sw A     sw B  sw delta                95% CI  per-req delta    win   tied
+dflash-official             60    4.766    4.932    -0.166      [-0.453, +0.117]  -0.143+-0.210    31%     3%
+dflash2-run-d-final         60    4.889    4.932    -0.042      [-0.354, +0.315]  +0.115+-0.173    53%     3%
+dflash2-run-d-mid           60    4.530    4.932    -0.402      [-0.752, -0.094]  +0.104+-0.162    44%     2%
+dspark-community            60    4.006    4.932    -0.926      [-1.314, -0.564]  -1.402+-0.291     5%     0%
+dspark-run-a-32k            60    4.589    4.932    -0.343      [-0.741, +0.092]  -0.158+-0.266    32%     0%
+dspark-run-b-49k            60    4.765    4.932    -0.166      [-0.553, +0.264]  -0.222+-0.249    31%     2%
+*control* dflash2 r2        60    4.908    4.932    -0.024      [-0.200, +0.126]  +0.046+-0.062    53%    72%
+
+== output bucket 64-128, concurrency 1 -- A vs dflash2 (greedy) ==
+A                            n     sw A     sw B  sw delta                95% CI  per-req delta    win   tied
+dflash-official            160    5.306    5.346    -0.040      [-0.277, +0.190]  +0.243+-0.176    57%     6%
+dflash2-run-d-final        160    6.019    5.346    +0.673      [+0.361, +1.119]  +1.416+-0.227    85%     4%
+dflash2-run-d-mid          160    5.782    5.346    +0.436      [+0.193, +0.746]  +1.326+-0.226    84%     4%
+dspark-community           160    3.719    5.346    -1.627      [-1.978, -1.363]  -2.605+-0.265     1%     0%
+dspark-run-a-32k           160    5.650    5.346    +0.304      [+0.107, +0.549]  +1.080+-0.240    74%     2%
+dspark-run-b-49k           160    5.486    5.346    +0.140      [-0.097, +0.431]  +1.035+-0.244    73%     1%
+*control* dflash2 r2       160    5.349    5.346    +0.004      [-0.015, +0.027]  +0.022+-0.043    53%    88%
+
+== output bucket >=1K, concurrency 1 -- A vs dflash2 (greedy) ==
+A                            n     sw A     sw B  sw delta                95% CI  per-req delta    win   tied
+dflash-official             20    4.071    4.003    +0.068      [-0.244, +0.211]  -0.259+-0.252    25%     0%
+dflash2-run-d-final         20    3.896    4.003    -0.106      [-0.343, +0.148]  -0.071+-0.224    45%     0%
+dflash2-run-d-mid           20    4.132    4.003    +0.129      [-0.082, +0.237]  -0.068+-0.172    47%     5%
+dspark-community            20    3.516    4.003    -0.487      [-0.764, -0.344]  -0.884+-0.279     0%     0%
+dspark-run-a-32k            20    3.667    4.003    -0.335      [-0.562, -0.166]  -0.565+-0.167     0%     0%
+dspark-run-b-49k            20    3.587    4.003    -0.415      [-0.584, -0.321]  -0.529+-0.154     5%     0%
+*control* dflash2 r2        20    4.081    4.003    +0.078      [-0.007, +0.228]  +0.042+-0.124    57%    65%
+```
+
+**The fine-tunes win short turns and lose long ones, and the effect is large
+where it exists.** In `64-128`, run-D final is +0.673 [+0.361, +1.119] over
+`dflash2` step-weighted and +1.416 per request, winning 85% of the calls that
+differ, against a control of +0.004 [-0.015, +0.027]. `dspark-run-a-32k` is
++0.304 [+0.107, +0.549] there. In `>=1K` the DSpark fine-tunes go the other way
+and clear the control doing it: -0.335 [-0.562, -0.166] for run-a and -0.415 for
+run-b, against a control of +0.078.
+
+This is the same shape `docs/RESULTS-paired.md` found by splitting calls after
+the fact. It now holds with output length as the **design** variable, bucketed
+on the recording rather than the replay, so the earlier concern that the split
+was selecting on the outcome does not apply.
+
+**`dspark-community` is far behind every other checkpoint** — -1.627 against
+`dflash2` in `64-128`, winning 1% of calls, and behind in every bucket at every
+concurrency. Its warm-started fine-tune `dspark-run-a-32k` scores 5.650 against
+its 3.719 in that bucket. That gap is the largest and least ambiguous result in
+the sweep, and it agrees with the +2.674 per-request gap already reported at
+temperature 1.0.
+
+**What the sweep does not resolve.** The `>=1K` bucket holds 20 calls; its
+repeat control is +0.078 while several of its effects are +-0.1 to -0.4, so only
+the DSpark deficits there clear it. `256-1K` holds 60 calls and its control is
+-0.024, so run-D midpoint's -0.402 [-0.752, -0.094] clears, but run-D final's
+-0.042 does not. Nothing in the `128-256` bucket clears its control except
+`dspark-community`.
+
+### Ranking on the reweighted full mix, concurrency 1
+
+| drafter | step-weighted | per-request |
+|---|---:|---:|
+| `dflash2-run-d-final` | **4.659** | **5.967** |
+| `dflash2` | 4.611 | 5.711 |
+| `dflash2-run-d-mid` | 4.561 | 5.943 |
+| `dflash-official` | 4.561 | 5.589 |
+| `dspark-run-b-49k` | 4.392 | 5.561 |
+| `dspark-run-a-32k` | 4.367 | 5.577 |
+| `dspark-community` | 3.743 | 4.290 |
+
+Note that on this mix, under greedy, run-D **final** edges `dflash2` on the
+token-weighted metric — the opposite of the temperature-1.0 full-set ordering in
+`docs/RESULTS-paired.md`, and consistent with task 3's finding that that ordering
+was never separable from zero. The margin is 0.048, well inside what the repeat
+control and the between-run spread in task 3 (sd 0.064-0.072) can support, so
+**this is not a claim that the final checkpoint is better** — it is a statement
+that the two orderings disagree and neither is resolved.
 
 ## Task 2 — SWE-bench Multilingual
 
