@@ -1,0 +1,63 @@
+{
+ "low": {
+  "calls": 350,
+  "out_tok": 62988,
+  "accept_len": 3.3175,
+  "draft_rate": 0.1545,
+  "tok_s": 35.51,
+  "ttft_p50": 2.905,
+  "ttft_p95": 13.381,
+  "tpot_p50": 0.00081,
+  "e2e_p50": 3.067
+ },
+ "medium": {
+  "calls": 369,
+  "out_tok": 126149,
+  "accept_len": 3.358,
+  "draft_rate": 0.1572,
+  "tok_s": 51.06,
+  "ttft_p50": 2.487,
+  "ttft_p95": 22.419,
+  "tpot_p50": 0.00032,
+  "e2e_p50": 2.604
+ },
+ "high": {
+  "calls": 333,
+  "out_tok": 129341,
+  "accept_len": 3.3047,
+  "draft_rate": 0.1536,
+  "tok_s": 44.03,
+  "ttft_p50": 3.426,
+  "ttft_p95": 28.483,
+  "tpot_p50": 0.00029,
+  "e2e_p50": 3.623
+ },
+ "xhigh": {
+  "calls": 701,
+  "out_tok": 183034,
+  "accept_len": 3.0447,
+  "draft_rate": 0.1363,
+  "tok_s": 55.14,
+  "ttft_p50": 2.256,
+  "ttft_p95": 15.857,
+  "tpot_p50": 0.00034,
+  "e2e_p50": 2.343
+ },
+ "pooled": {
+  "calls": 1753,
+  "out_tok": 501512,
+  "accept_len": 3.2185,
+  "draft_rate": 0.1479,
+  "tok_s": 47.76,
+  "ttft_p50": 2.599,
+  "ttft_p95": 19.778,
+  "tpot_p50": 0.00038,
+  "e2e_p50": 2.719
+ },
+ "_meta": {
+  "name": "_c64-dspark-community",
+  "trace": "/mnt/data/traces/tb-_c64-dspark-community/calls.clean.jsonl",
+  "errored": 0,
+  "no_strength": 0
+ }
+}

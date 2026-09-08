@@ -26,6 +26,11 @@ METHOD="${METHOD:-dspark}"
 PORT="${PORT:-8001}"
 CONC="${CONC:-10}"
 REPO="${REPO:-/mnt/data/src/muse-glimmer-dspark}"
+# Which serve wrapper to launch. The scale-fix control was originally run via a
+# one-line fork of this script pointing at serve_patched_fix.sh; this knob
+# replaces the fork. serve_patched.sh now carries the DFlash2 knob patch
+# itself, so the default is the right choice for new runs.
+SERVE="${SERVE:-docker/serve_patched.sh}"
 SRC="${SRC:-/mnt/data/eval/raw.parquet}"
 TRACE_DIR="/mnt/data/traces/tb-$NAME"
 CTR="vllm-$NAME"
@@ -50,7 +55,7 @@ sudo docker run -d --name "$CTR" --gpus '"device=0"' --network host --ipc host \
   -e TARGET_MODEL=meta-models/Muse-Glimmer-30B \
   -e SPEC_METHOD="$METHOD" -e SPECULATOR="$SPEC" \
   -e NUM_SPEC_TOKENS=15 -e PORT="$PORT" -e ADAPTIVE="${ADAPTIVE:-0}" \
-  specd:latest bash "$REPO/docker/serve_patched.sh" >/dev/null
+  specd:latest bash "$REPO/$SERVE" >/dev/null
 
 echo "[$NAME] waiting for health on :$PORT"
 for i in $(seq 1 180); do

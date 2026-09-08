@@ -3,14 +3,14 @@
 Companion to the Terminal-Bench replay eval, not a replacement. **The two use
 different decoding regimes and their numbers must not be put in one table.**
 
-> **One row is invalid: the DFlash2 fine-tune.** It was served through the
-> unpatched `docker/serve_patched.sh` that was on the node, which drops
-> DFlash2's `output_multiplier` (0.196) and `final_logit_softcapping` (20.0)
-> for *converted* speculators-format checkpoints — a 5.1x logit-scale error.
-> Its baseline `dflash2` is a native z-lab checkpoint and is **not** affected,
-> so that comparison is asymmetric and its apparent regression is not
-> attributable to the fine-tune. Details in "The DFlash2 fine-tune rows are
-> confounded" below. Every other row is unaffected.
+> **Correction (2026-09-08).** These rows were briefly marked invalid because
+> the DFlash2 fine-tune was served through a build that drops
+> `output_multiplier` / `final_logit_softcapping` for converted checkpoints
+> while its native baseline kept them. The bug is real, but the Terminal-Bench
+> control shows it is **acceptance-neutral** (+0.005, at the noise floor):
+> drafting selects by argmax/top-k and both transforms are monotonic, so they
+> cannot change which tokens are proposed. **All rows below stand as measured.**
+> See "The DFlash2 logit-scale bug" below.
 
 ## Decoding regime
 
@@ -42,10 +42,7 @@ cannot leak in.
 | DSpark (`dspark-community`) | dspark | 4.658 | +0.0000 | 0.244 | 236.4 | 0.878 |
 | **DFlash 2** (`dflash2`) | dflash | **5.748** | +0.0000 | 0.317 | 296.1 | 0.878 |
 | DSpark fine-tuned (`dspark-run-a-32k`) | dspark | 4.541 | +0.0000 | 0.236 | 230.4 | 0.878 |
-| DFlash2 fine-tuned (`dflash2-run-d-32k-mix-step1976`) ⚠️ | dflash | _5.299_ | +0.0000 | 0.287 | 273.2 | 0.878 |
-
-⚠️ = served at the wrong logit scale; see the banner above. The number is a
-faithful measurement of what was served, not of the checkpoint.
+| DFlash2 fine-tuned (`dflash2-run-d-32k-mix-step1976`) | dflash | 5.299 | +0.0000 | 0.287 | 273.2 | 0.878 |
 
 The two acceptance paths agree exactly, not merely to ~0.01: for `dflash2` the
 server counters read 154,620 accepted / 32,567 drafts and the summed
@@ -62,7 +59,7 @@ Same regime, same driver, same drafter order; only the prompt set differs.
 | DSpark (`dspark-community`) | dspark | 4.528 | +0.0000 | 0.235 | 230.2 | 0.710 |
 | **DFlash 2** (`dflash2`) | dflash | **5.436** | +0.0000 | 0.296 | 280.7 | 0.712 |
 | DSpark fine-tuned (`dspark-run-a-32k`) | dspark | 4.440 | +0.0000 | 0.229 | 225.8 | 0.712 |
-| DFlash2 fine-tuned (`dflash2-run-d-32k-mix-step1976`) ⚠️ | dflash | _5.054_ | +0.0000 | 0.270 | 261.2 | 0.710 |
+| DFlash2 fine-tuned (`dflash2-run-d-32k-mix-step1976`) | dflash | 5.054 | +0.0000 | 0.270 | 261.2 | 0.710 |
 
 **Read the MBPP numbers with more caution than the HumanEval ones.** 133 of 500
 generations hit the 2048-token cap and they carry **43.4%** of all tokens
@@ -106,33 +103,36 @@ ordering is inverted in ours on **both** tasks (published has DSpark ahead by
 across two independent benchmarks is a property of this target model, not
 noise.
 
-## The finding that stands: the DSpark fine-tune regresses
+## Both fine-tunes regress on standalone coding work
 
-| task | comparison | baseline | fine-tune | Δ | verdict |
-|---|---|---|---|---|---|
-| HumanEval | DSpark | 4.658 | 4.541 | **−0.118** | real |
-| MBPP | DSpark | 4.528 | 4.440 | **−0.088** | real |
-| HumanEval | DFlash 2 | 5.748 | 5.299 | −0.449 | **confounded** |
-| MBPP | DFlash 2 | 5.436 | 5.054 | −0.383 | **confounded** |
+| task | comparison | baseline | fine-tune | Δ |
+|---|---|---|---|---|
+| HumanEval | DSpark | 4.658 | 4.541 | **−0.118** |
+| MBPP | DSpark | 4.528 | 4.440 | **−0.088** |
+| HumanEval | DFlash 2 | 5.748 | 5.299 | **−0.449** |
+| MBPP | DFlash 2 | 5.436 | 5.054 | **−0.383** |
 
-The two DSpark rows are the ones to trust. Both drafters are speculators-format
-(`speculators_model_type: dspark`), neither carries the output-shaping knobs,
-and no DSpark code path reads them — the comparison is symmetric. Both deltas
-are far outside the 0.005 noise floor, both survive the truncation sensitivity
-check, and the effect reproduces on two independent benchmarks.
+All four are far outside the 0.005 noise floor, all four survive the truncation
+sensitivity check, and the effect reproduces on two independent benchmarks.
 
-The two DFlash 2 rows cannot be read as a fine-tune result until the row is
-re-run with a serve script carrying the knob patch. Our fine-tunes were trained on Terminal-Bench agent traces, so
+Read this next to `docs/RESULTS.md`, though: on **Terminal-Bench** — the
+workload we deploy on — `dspark-run-a-32k` beats its baseline by **+0.62**. The
+DSpark fine-tune trades generic coding acceptance for a large gain on the agent
+traces it was trained on, which is the trade we wanted. The DFlash2 fine-tune
+gets no such compensation: it is 0.091 below its baseline on Terminal-Bench
+too. Our fine-tunes were trained on Terminal-Bench agent traces, so
 losing acceptance on standalone HumanEval-style code generation is consistent
 with specialisation to that distribution — but on the evidence that survives,
 that claim is established only for DSpark. `dflash2` (unmodified, native) is
 the best drafter on both tasks by a wide margin and is a clean measurement.
 
-## The DFlash2 fine-tune rows are confounded
+## The DFlash2 logit-scale bug
 
-Found after the sweeps, while committing: `docker/serve_patched.sh` in the
-working tree carries a patch that the copy on the node did not have, and the
-difference falls asymmetrically across exactly one comparison.
+Found after the sweeps: `docker/serve_patched.sh` in the working tree carries a
+patch the copy on the node did not have, and the difference falls
+asymmetrically across exactly one comparison. It looked like it invalidated
+those rows. It does not — the measured effect is at the noise floor — but the
+bug is real and the asymmetry is worth understanding.
 
 `vllm/transformers_utils/configs/speculators/algos.py::update_dflash2` rebuilds
 a native `dflash_config` from a speculators-format checkpoint and forwards only
@@ -149,33 +149,29 @@ Which side of that each drafter lands on:
 | `dflash2` (baseline) | native z-lab, ships its own `dflash_config` | yes, bypasses `update_dflash2` | scale 0.196, cap 20.0 ✅ |
 | `dflash2-run-d-32k-mix-step1976` | speculators-format, knobs at top level | **no, silently dropped** | scale 1.0, no cap ❌ |
 
-The fine-tune's weights were fit for scale 0.196 (it was trained with
-`patches/speculators-dflash2-output-shaping.patch`), so it was served with a
-5.1x logit mismatch while its baseline was served correctly. Nothing in the
-stack errors on this. Lower acceptance is the expected symptom, which is
-exactly what the two rows show — so the regression cannot be separated from the
-bug.
+The fine-tune's weights were fit for scale 0.196, so it was served at a 5.1x
+logit mismatch while its baseline was served correctly, and nothing in the
+stack errors on it.
+
+**But acceptance is invariant to it.** Re-serving `step1976` on Terminal-Bench
+with both values restored moved it 3.9139 -> 3.9191 on server counters:
++0.005, at the 0.005 noise floor. That is what theory predicts — drafting
+selects by argmax/top-k, and a positive scale and a tanh soft cap are both
+monotonic, so neither can change which tokens get proposed. The bug bites
+during *training*, where the loss is not invariant (0.406 vs 2.155 at step 0),
+not during serving.
 
 The DSpark pair is not affected: both are speculators-format, symmetric, and
 neither `config.json` carries the knobs (the only `final_logit_softcapping`
 reader outside DFlash2 is `gemma4_dspark.py`, a different model family).
 `dflash-official` is a plain DFlash1 checkpoint and never touches this path.
 
-This is the trap `docs/HANDOFF-dflash2.md` already names: its step 1 is
-`grep -c output_multiplier .../speculators/algos.py`, with "`0` means the eval
-measured a 5.1x logit mismatch, not the fine-tune". The count is 0 on the image
-these sweeps used, so run D's Terminal-Bench regression (4.02 baseline -> 3.80
-final) and the two rows here are all the same unresolved confound rather than
-three independent results. That is one more reason to treat the DFlash2
-fine-tune as unmeasured: nothing has yet compared it against its baseline on an
-even footing.
-
-**To resolve it:** re-run that one drafter on both tasks with a serve script
-carrying the vLLM-side fix (the patched `docker/serve_patched.sh`, or
-`patches/vllm-dflash2-output-shaping.patch`), and confirm
-`dflash2 knob patch OK` in the server log alongside the existing
-`Using V2 Model Runner` check. About one GPU-hour for both tasks. Until then the
-DFlash2 fine-tune is unmeasured, not worse.
+`docs/HANDOFF-dflash2.md` proposed this as the explanation for run D's
+Terminal-Bench regression. The control has now been run and rules it out: the
+DFlash2 fine-tune is genuinely worse than its baseline, on Terminal-Bench and
+on both coding benchmarks. Any re-run of a converted DFlash2 checkpoint should
+still use the patched serve script and confirm `dflash2 knob patch OK` in the
+log, alongside the existing `Using V2 Model Runner` check.
 
 ## Caveats, in order of how much they could move a number
 

@@ -1,0 +1,16 @@
+[
+  {
+    "phase": "profile",
+    "round": 0,
+    "concurrency": 1,
+    "started_at_unix": 1788827564.5074759,
+    "makespan_s": 5.466140646999975,
+    "requests": 1,
+    "errors": 0,
+    "output_tokens": 512,
+    "request_latencies_s": [
+      5.4661044099998435
+    ],
+    "tokens_per_s": 93.66754956826898
+  }
+]

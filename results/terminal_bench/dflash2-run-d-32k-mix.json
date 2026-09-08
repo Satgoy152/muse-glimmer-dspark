@@ -1,0 +1,63 @@
+{
+ "low": {
+  "calls": 350,
+  "out_tok": 54673,
+  "accept_len": 4.6771,
+  "draft_rate": 0.2451,
+  "tok_s": 95.07,
+  "ttft_p50": 0.862,
+  "ttft_p95": 4.994,
+  "tpot_p50": 2e-05,
+  "e2e_p50": 0.889
+ },
+ "medium": {
+  "calls": 369,
+  "out_tok": 209429,
+  "accept_len": 3.6661,
+  "draft_rate": 0.1777,
+  "tok_s": 116.7,
+  "ttft_p50": 1.285,
+  "ttft_p95": 14.199,
+  "tpot_p50": 1e-05,
+  "e2e_p50": 1.343
+ },
+ "high": {
+  "calls": 333,
+  "out_tok": 128615,
+  "accept_len": 3.9025,
+  "draft_rate": 0.1935,
+  "tok_s": 94.95,
+  "ttft_p50": 2.015,
+  "ttft_p95": 14.591,
+  "tpot_p50": 1e-05,
+  "e2e_p50": 2.079
+ },
+ "xhigh": {
+  "calls": 701,
+  "out_tok": 181287,
+  "accept_len": 3.843,
+  "draft_rate": 0.1895,
+  "tok_s": 90.01,
+  "ttft_p50": 1.281,
+  "ttft_p95": 9.921,
+  "tpot_p50": 1e-05,
+  "e2e_p50": 1.292
+ },
+ "pooled": {
+  "calls": 1753,
+  "out_tok": 574004,
+  "accept_len": 3.8537,
+  "draft_rate": 0.1902,
+  "tok_s": 100.03,
+  "ttft_p50": 1.262,
+  "ttft_p95": 10.894,
+  "tpot_p50": 1e-05,
+  "e2e_p50": 1.282
+ },
+ "_meta": {
+  "name": "dflash2-run-d-32k-mix",
+  "trace": "/mnt/data/traces/tb-dflash2-run-d-32k-mix/calls.clean.jsonl",
+  "errored": 0,
+  "no_strength": 0
+ }
+}
