@@ -287,34 +287,103 @@ unless that instance produced replayable calls.
 
 ## Task 3 — Terminal-Bench replay repeats
 
-*partial — the two extra replays per checkpoint are queued behind task 1. The
-table below is the existing single runs, re-pooled, and is what the extra runs
-are being added to.*
+**Complete.**
 
-### Where the question stands before the repeats
+Two more full-set replays were run for each of the three checkpoints, at the
+original settings (temperature 1.0, top_k 64, concurrency 10,
+`NUM_SPEC_TOKENS=15`, **no** generation cap — task 1's cap deliberately does not
+apply here, because a long draw recurring is the thing being measured). With the
+runs already on disk that is four runs of `dflash2` and three each of the two
+run-D checkpoints.
+
+### Answer: the ordering does not survive
+
+| pooling | midpoint | final | delta | 95% CI | verdict |
+|---|---:|---:|---:|---|---|
+| step-weighted, as measured | 3.9871 | 3.9206 | **+0.0664** | [−0.0299, +0.1618] | not separable from zero |
+| step-weighted, longest call per run dropped | 4.0159 | 3.9790 | **+0.0369** | [−0.0278, +0.1003] | not separable from zero |
+| **per-request** | 6.3491 | **6.3570** | **−0.0079** | — | **final is nominally ahead** |
+
+Paired bootstrap over calls, 2,000 resamples, three runs per checkpoint,
+balanced. On the token-weighted metric the sign is preserved but the interval
+covers zero; on the per-request metric the sign reverses. **The
+midpoint-beats-final ordering is not a result at three runs each.**
+
+Three runs is a run-to-run stability check, not statistical power, and the
+repeats show why that distinction matters:
+
+| checkpoint | runs | mean | **between-run sd** | min | max |
+|---|---:|---:|---:|---:|---:|
+| `dflash2` | 4 | 4.0075 | **0.0151** | 3.9944 | 4.0292 |
+| run-D midpoint | 3 | 3.9890 | **0.0716** | 3.9085 | 4.0459 |
+| run-D final | 3 | 3.9234 | **0.0639** | 3.8537 | 3.9793 |
+
+The paired bootstrap resamples calls *within* a run, so it says how tightly one
+run pins its own number down — not where the next run will land. For the two
+run-D checkpoints the between-run spread is roughly 4x `dflash2`'s and of the
+same order as the ±0.11 bootstrap interval quoted in `docs/RESULTS-paired.md`.
+
+### The 58,019-token completion was not bad luck
+
+The handoff describes the final checkpoint's regression as resting on "one run
+that drew a single 58,019-token completion". The repeats say otherwise.
+
+Longest completion in each run, and how many calls exceeded 16K tokens:
+
+| checkpoint | run | longest call | calls >16K |
+|---|---|---:|---:|
+| `dflash2` | four runs | 10,127 / 9,900 / 7,885 / 7,223 | 0 / 0 / 0 / 0 |
+| run-D midpoint | three runs | 10,318 / 9,394 / 8,204 | 0 / 0 / 0 |
+| **run-D final** | three runs | **58,019 / 21,577 / 18,163** | **1 / 1 / 1** |
+
+Every one of the final checkpoint's three runs produced a call over 16K tokens.
+**None of the other seven runs produced one at all.** And it is the same
+trajectory every time — `c8be87c4ba67de0b` — which supplied the longest call in
+all three final runs and, in one of them, the two longest (18,163 and 16,238).
+That trajectory appears in every run of every checkpoint; only under the final
+checkpoint does it run away.
+
+So the correct statement is not that one run was unlucky. **The final checkpoint
+reproducibly drives one trajectory into a very long generation, and that is what
+depresses its token-weighted acceptance.** Dropping the longest call per run,
+which the table above still reports, is therefore not outlier removal — it
+deletes a real and repeatable behaviour of the checkpoint, and understates what a
+deployment would see.
+
+This also says something the acceptance numbers do not: speculative decoding is
+supposed to be output-preserving, so the drafter should not change *what* the
+target generates at all. It does. The same effect shows up in the greedy
+divergence measured above, and here it has a direction.
+
+**Read this as an observation, not a finding.** The pattern was noticed in the
+data and then quantified, which is exactly the setting where a p-value
+overstates. Treating the ten runs as exchangeable, the probability that one
+group of three holds all three of the top-three maxima is 1/C(10,3) = 0.008 —
+suggestive, and the same-trajectory detail is stronger than that number, but the
+honest test is a targeted one: replay `c8be87c4ba67de0b` alone, say twenty times
+per checkpoint, and see whether the runaway rate separates. That has not been
+run.
+
+### Per-run detail
 
 Full-set replays, temperature 1.0 / top_k 64 / concurrency 10 /
 `NUM_SPEC_TOKENS=15`, re-pooled by `benchmark/analysis/task3_repeats.py`:
 
 | checkpoint | run | calls | out tok | max completion | accept_len (step-w) | accept_len (per-req) | step-w, longest call dropped |
 |---|---|---:|---:|---:|---:|---:|---:|
-| `dflash2` | `tb-dflash2` | 1,753 | 509,389 | 9,900 | 4.0020 | 5.6748 | 4.0325 |
-| `dflash2` | `tb-dflash2-repeat2` | 1,753 | 493,449 | 7,885 | 4.0045 | 5.6497 | 4.0270 |
-| run-D midpoint (step 1976) | `tb-dflash2-run-d-32k-mix-step1976` | 1,753 | 513,780 | 8,204 | 3.9085 | 6.2888 | 3.9349 |
-| run-D final (step 3956) | `tb-dflash2-run-d-32k-mix` | 1,753 | 574,004 | **58,019** | 3.8537 | 6.2957 | 3.9312 |
+| `dflash2` | `tb-dflash2` (existing) | 1,753 | 509,389 | 9,900 | 4.0020 | 5.6748 | 4.0325 |
+| `dflash2` | `tb-dflash2-repeat2` (existing) | 1,753 | 493,449 | 7,885 | 4.0045 | 5.6497 | 4.0270 |
+| `dflash2` | repeat r2 (new) | 1,753 | 500,768 | 7,223 | 3.9944 | 5.6480 | 4.0153 |
+| `dflash2` | repeat r3 (new) | 1,753 | 515,233 | 10,127 | 4.0292 | 5.6822 | 4.0510 |
+| run-D midpoint (step 1976) | `tb-dflash2-run-d-32k-mix-step1976` (existing) | 1,753 | 513,780 | 8,204 | 3.9085 | 6.2888 | 3.9349 |
+| run-D midpoint | repeat r2 (new) | 1,753 | 500,623 | 10,318 | 4.0124 | 6.3782 | 4.0469 |
+| run-D midpoint | repeat r3 (new) | 1,753 | 499,925 | 9,394 | 4.0459 | 6.3805 | 4.0719 |
+| run-D final (step 3956) | `tb-dflash2-run-d-32k-mix` (existing) | 1,753 | 574,004 | **58,019** | 3.8537 | 6.2957 | 3.9312 |
+| run-D final | repeat r2 (new) | 1,753 | 508,234 | **18,163** | 3.9793 | 6.3892 | 4.0227 |
+| run-D final | repeat r3 (new) | 1,753 | 542,703 | **21,577** | 3.9370 | 6.3853 | 3.9850 |
 
-**The single 58,019-token completion is most of the gap.** Removing each run's
-own longest call — a diagnostic, not a correction — moves the final checkpoint
-from 3.8537 to 3.9312 and the midpoint from 3.9085 to 3.9349, and the paired
-bootstrap over calls goes from
-
-* as measured: mid − final = **+0.0548**, 95% CI [−0.0967, +0.2077]
-* longest call dropped: mid − final = **−0.0306**, 95% CI [−0.1354, +0.0673]
-
-Neither interval excludes zero, and the sign flips. On the **per-request**
-pooling the two checkpoints are 6.2888 and 6.2957 — the final checkpoint is
-nominally *ahead*. So even before the repeats, the midpoint-beats-final ordering
-is a single draw on a token-weighted metric and not a separable difference. The
-repeats are being run to say whether that holds across three runs each; three
-runs is a run-to-run stability check, not statistical power.
+Both run-D checkpoints' *original* runs are the lowest of their three, which is
+worth noting and not over-reading: `dflash2`'s two original runs sit in the
+middle of its four, so there is no consistent old-harness-versus-new-harness
+shift to explain it.
 

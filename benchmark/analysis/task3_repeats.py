@@ -105,6 +105,21 @@ def main():
         for k, v in rs.items():
             pooled[ck].setdefault(name, {})[k] = v
 
+    # Between-run spread. The paired bootstrap resamples calls within a run, so
+    # it measures how well one run pins its own number down -- not how far the
+    # next run will land. With repeats in hand the second question is answerable,
+    # and the answer is bigger than the first number suggests.
+    print("\nbetween-run spread of the step-weighted pool")
+    print(f"{'checkpoint':<22}{'runs':>6}{'mean':>9}{'sd':>9}{'min':>9}{'max':>9}"
+          f"{'max_ctok per run':>34}")
+    for ck, byrun in sorted(pooled.items()):
+        vals = [sw(rs) for rs in byrun.values()]
+        mx = sorted((max(rs[k]["ctok"] for k in rs) for rs in byrun.values()), reverse=True)
+        mu = sum(vals) / len(vals)
+        sd = (sum((v - mu) ** 2 for v in vals) / (len(vals) - 1)) ** 0.5 if len(vals) > 1 else 0.0
+        print(f"{ck:<22}{len(vals):>6}{mu:>9.4f}{sd:>9.4f}{min(vals):>9.4f}{max(vals):>9.4f}"
+              f"{'  ' + ', '.join(f'{m:,}' for m in mx):>34}")
+
     print("\npooled over runs, per checkpoint")
     print(f"{'checkpoint':<22}{'runs':>6}{'calls':>8}{'accept_sw':>11}{'accept_pr':>11}"
           f"{'sw_drop_max_per_run':>21}")
