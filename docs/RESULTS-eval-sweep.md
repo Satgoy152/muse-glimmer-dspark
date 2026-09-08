@@ -55,6 +55,48 @@ difference is large and one-directional: on the no-spec `64-128` cell at
 concurrency 1 the server reports a 0.212 s mean TTFT and the client's p50 is
 1.432 s.
 
+### Greedy does not make the drafters emit the same tokens
+
+The handoff's reason for preferring greedy was that every drafter would then
+decode the same token sequence, making the comparison exact. It asked for the
+completion hashes to be verified before pooling. They were, and **the assumption
+is false at this prompt and output length.**
+
+`replay.py` reconstructs `content` from the streamed deltas but never reassembles
+`tool_call` deltas, and this model routes ~99.5% of a turn into `tool_calls`, so
+a content hash is empty on almost every call and matches vacuously. The check
+that bites is per-call `completion_tokens`, which under identical greedy decoding
+must be identical.
+
+Share of calls with an identical completion length, concurrency 1:
+
+| bucket | `dflash2` vs no-spec | **`dflash2` vs itself (r1 vs r2)** | median relative difference where they differ |
+|---|---:|---:|---:|
+| `64-128` | 83.8% | **96.2%** | 9 tokens |
+| `128-256` | 53.3% | **83.3%** | 47 tokens |
+| `256-1K` | 43.3% | **80.0%** | 86 tokens |
+| `>=1K` | 20.0% | **70.0%** | 262 tokens |
+
+The second column is the one that matters. **The same drafter, same config, same
+manifest, replayed twice, diverges too** — so most of what the first column shows
+is not "drafter A decodes differently from drafter B", it is vLLM not being
+bitwise reproducible run to run at this scale. Divergence probability compounds
+per token, which is why agreement falls monotonically with output length.
+
+This does not invalidate anything, but it changes what the greedy rows are:
+
+* Pairing on `replay_of` is still exact — both sides saw a byte-identical prompt.
+* The comparison is **paired-with-noise, not exact.** A per-call acceptance
+  difference is partly a drafter difference and partly a different continuation.
+* So every task-1 comparison is read against the `dflash2` r1-vs-r2 repeat
+  control in the same cell, never against zero. That control is why it was run.
+
+Greedy is still the better choice than temperature 1.0 — 96% agreement on short
+turns beats 0% by construction — it just does not deliver the exactness the
+HumanEval and MBPP tables in `docs/RESULTS-paired.md` have. Those are single-turn
+code completions with short prompts and short outputs, where the per-token
+divergence probability has far less room to compound.
+
 ### TTFT and the prefix cache
 
 Every drafter's server is started cold, and the four bucket manifests are then
