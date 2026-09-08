@@ -55,6 +55,24 @@ difference is large and one-directional: on the no-spec `64-128` cell at
 concurrency 1 the server reports a 0.212 s mean TTFT and the client's p50 is
 1.432 s.
 
+### TTFT and the prefix cache
+
+Every drafter's server is started cold, and the four bucket manifests are then
+replayed against it at concurrency 1, 2, 8 and 32 in that order. So:
+
+* **TTFT is comparable across drafters** at a fixed (bucket, concurrency) — every
+  server reaches that cell having served exactly the same traffic before it.
+* **TTFT is not comparable across concurrencies within a drafter.** The
+  concurrency-2 pass replays prompts the concurrency-1 pass has already served,
+  so it runs against a warmer prefix cache. The effect is large: an early
+  no-spec cell run against a server that had already served the same manifest
+  reported a 0.045 s mean TTFT where the same cell on a cold server reported
+  0.212 s.
+
+`request_decode_time_seconds` starts after the first token, so `accept_len`,
+`t_step`, TPOT and decode tok/s are untouched by any of this. Only TTFT and the
+wall-clock throughput column see the cache.
+
 Acceptance is reported under **both** poolings, because they disagree and both
 are real:
 

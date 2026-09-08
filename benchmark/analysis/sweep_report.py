@@ -118,13 +118,17 @@ def collect():
         srv = server_side(base + ".before.prom", base + ".prom")
         pc = per_call(m.get("trace", ""))
         macro = [1 + v["acc"] / v["steps"] for v in pc.values() if v["steps"] >= 5]
+        # Calls that ran into the bucket's max_tokens. The cap exists to stop a
+        # greedy repetition loop from becoming the whole bucket; how often it
+        # actually bites is a property of the result and has to be shown.
+        capped = sum(1 for v in pc.values() if v.get("fr") == "length")
         cells[cell] = {
             "meta": m, "client": d.get("pooled", {}), "server": srv,
             "n_calls": len(pc),
             "out_tok": sum(v["ctok"] for v in pc.values()),
             "max_ctok": max((v["ctok"] for v in pc.values()), default=0),
             "accept_len_pr": (sum(macro) / len(macro)) if macro else float("nan"),
-            "n_pr": len(macro),
+            "n_pr": len(macro), "capped": capped,
             "percall": pc,
         }
     return cells
@@ -164,10 +168,10 @@ def main():
     # which a 55 tok/s no-spec server hits at ~49K tokens and a 200 tok/s drafter
     # does not. An error count that differs across drafters in the same cell
     # means the cell is not comparing the same call set.
-    W = ("| drafter | calls | err | out tok | max ctok | accept_len (step-w) | "
+    W = ("| drafter | calls | err | capped | out tok | max ctok | accept_len (step-w) | "
          "accept_len (per-req) | t_step ms | TPOT ms | decode tok/s | vs no-spec | "
          "TTFT mean s | wall tok/s |")
-    SEP = "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+    SEP = "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
 
     for c in concs:
         for b in BUCKETS + ["full"]:
@@ -184,7 +188,7 @@ def main():
                 wall = v["out_tok"] / v["meta"]["wall_s"] if v["meta"].get("wall_s") else None
                 lines.append(
                     f"| `{k}` | {v['n_calls']} | {v['meta'].get('errored', 0)} | "
-                    f"{v['out_tok']:,} | {v['max_ctok']:,} | "
+                    f"{v['capped']} | {v['out_tok']:,} | {v['max_ctok']:,} | "
                     f"{fmt(s.get('accept_len_sw'),1)} | {fmt(v['accept_len_pr'],1)} | "
                     f"{fmt(s.get('t_step_ms'),1)} | {fmt(s.get('tpot_ms'),1)} | "
                     f"{fmt(s.get('decode_tok_s'),1,1)} | "
