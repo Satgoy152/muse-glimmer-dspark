@@ -14,18 +14,24 @@ Three regimes, **not comparable to each other**:
 
 ## Acceptance length
 
+Terminal-Bench is quoted from the **server `/metrics` counters**, which cover
+every call; per-request pooling silently omits calls that returned an empty
+metrics block, and on these runs that is worth up to 0.03. The coding
+benchmarks are quoted from per-request pooling, which agreed with the counters
+to +0.0000 on all ten runs.
+
 | Drafter | Terminal-Bench | HumanEval | MBPP |
 |---|---|---|---|
-| `dflash-official` | 3.854 | 4.853 | 4.803 |
-| **`dflash2`** (native, unmodified) | **4.002** | **5.748** | **5.436** |
-| `dspark-community` | 3.185 | 4.658 | 4.528 |
-| `dspark-run-a-32k` *(ours)* | 3.804 | 4.541 | 4.440 |
-| `dspark-run-b-49k` *(ours)* | 3.777 | — | — |
-| `dflash2-run-d-32k-mix` *(ours)* | 3.854 | — | — |
-| `dflash2-run-d-...-step1976` *(ours)* | 3.909 | 5.299 ⚠️ | 5.054 ⚠️ |
-| └ same checkpoint, **scale-fixed** | **3.949** | not run | not run |
+| `dflash-official` | 3.859 | 4.853 | 4.803 |
+| **`dflash2`** (native, unmodified) | **4.005** | **5.748** | **5.436** |
+| `dspark-community` | 3.185 † | 4.658 | 4.528 |
+| `dspark-run-a-32k` *(ours)* | 3.810 | 4.541 | 4.440 |
+| `dspark-run-b-49k` *(ours)* | 3.772 | — | — |
+| `dflash2-run-d-32k-mix` *(ours)* | 3.862 | — | — |
+| `dflash2-run-d-...-step1976` *(ours)* | 3.914 | 5.299 | 5.054 |
+| └ same checkpoint, scale-fixed (control) | 3.919 | not run | not run |
 
-⚠️ = served at the wrong logit scale (see "The DFlash2 confound").
+† per-request pooling; this run has no `/metrics` scrape.
 
 **Unmodified `dflash2` wins on all three.** Published reference for context
 (different target model, so only direction transfers): HumanEval 4.11 / 4.33 /
@@ -41,22 +47,30 @@ was trained on, and Terminal-Bench is the workload we care about — so this
 fine-tune is a keeper. The 49k variant is slightly worse than the 32k one
 (3.777).
 
-**DFlash2 fine-tune is not.** Even with the logit-scale bug fixed it reaches
-3.949 against the 4.002 native baseline — still 0.053 short, ~20x the noise
-floor. The scale fix is real but only recovers +0.040 of the 0.093 gap.
+**DFlash2 fine-tune is not.** It sits 0.091 below the native baseline on
+Terminal-Bench (3.914 vs 4.005), ~17x the noise floor, and 0.45 / 0.38 below on
+HumanEval / MBPP. The logit-scale bug does not explain it: see below.
 
-## The DFlash2 confound
+## The DFlash2 logit-scale bug is real, and does not move acceptance
 
 vLLM's `update_dflash2` drops `output_multiplier` (0.196) and
 `final_logit_softcapping` (20.0) when rebuilding config for a *converted*
 speculators-format checkpoint; `qwen3_dflash2.py` then defaults to `scale=1.0`,
-no cap. Native `dflash2` ships its own `dflash_config` and is unaffected — so
-any comparison of our converted fine-tune against it was asymmetric, at a 5.1x
-logit mismatch. Fixed in `docker/serve_patched.sh`.
+no cap. Native `dflash2` ships its own `dflash_config` and is unaffected, so
+every comparison of our converted fine-tune against it was served asymmetrically.
+Fixed in `docker/serve_patched.sh`.
 
-The Terminal-Bench control (`control-dflash2-run-d-step1976-scalefix`) is the
-only re-run done with the fix. **The two coding-benchmark rows were never
-re-run and remain unmeasured** — about one GPU-hour to settle.
+**It is nonetheless acceptance-neutral, so the rows above stand.** Re-serving
+`step1976` with both values restored moved it 3.9139 -> 3.9191 on server
+counters: **+0.005, at the 0.005 noise floor.** That is the expected result --
+drafting selects by argmax/top-k, and a positive scale and a tanh soft cap are
+both monotonic, so they cannot change which tokens are proposed. The
+measurement was never the problem; the checkpoint is simply worse than its
+baseline.
+
+The bug still matters for **training**, where the loss is not invariant to it
+(`patches/apply_dflash2_output_shaping.py` records 0.406 vs 2.155 at step 0),
+and it is worth fixing upstream regardless.
 
 ## pass@1
 
@@ -104,8 +118,14 @@ so a second draft pass breaks even at only a +12% acceptance gain — see
 
 ## Things that would change a number
 
-- **Noise floor 0.0025** on pooled acceptance, measured by replaying `dflash2`
-  twice (4.0020 vs 4.0045). Differences below ~0.005 are not real.
+- **Noise floor ~0.005** on pooled acceptance, measured by replaying `dflash2`
+  twice unchanged (4.0047 vs 4.0101 on server counters).
+- **A single runaway generation outweighs that noise.**
+  `dflash2-run-d-32k-mix` drew one 58,019-token completion where every other
+  run peaks at 8-10K; it alone pulls that row's per-request pooled acceptance
+  from 3.931 to 3.854. Check `max(completion_tokens)` before believing a
+  sub-0.01 difference, and prefer the server counters where a run has many
+  empty per-request metrics blocks.
 - **Acceptance is not contention-independent.** Concurrency 10 -> 64 adds
   +0.014 to +0.070 depending on drafter, so concurrency is pinned and reported.
 - **Truncation at the 2048-token cap** on the coding benchmarks: 20/164
