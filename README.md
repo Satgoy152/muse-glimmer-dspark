@@ -16,13 +16,12 @@ This project fine-tunes a speculator on curated on-policy coding and agentic tra
 ## Data
 
 - Replay: [DaoCloud/Muse-Glimmer-OPB-100K](https://huggingface.co/datasets/DaoCloud/Muse-Glimmer-OPB-100K) — 99,984 conversations / 148,900 rows, pre-tokenized, on-policy Glimmer
-- New training traces: [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) over SWE-Gym, repos disjoint from eval (To be released)
+- New training traces: [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) over SWE-Gym, repos disjoint from eval: [Satgoy152/Muse-Glimmer-SWE-Gym-2k](https://huggingface.co/datasets/Satgoy152/Muse-Glimmer-SWE-Gym-2k)
   - 2000 instances, balanced round-robin across SWE-Gym's 11 repos.
   - Every instance is verified with a pre-built docker image.
-  - **Limitation:** SWE-bench-extra would have added ~1100 more repos (increased data variation), but it has no published images.
-- Eval: Terminal-Bench — [Satgoy152/Muse-Glimmer-Terminal-Bench-Eval](https://huggingface.co/datasets/Satgoy152/Muse-Glimmer-Terminal-Bench-Eval) (private)
+- Eval: Terminal-Bench — [Satgoy152/Muse-Glimmer-Terminal-Bench-Eval](https://huggingface.co/datasets/Satgoy152/Muse-Glimmer-Terminal-Bench-Eval) 
   - 40 of 241 tasks, mixed across difficulty (11 easy / 20 medium / 9 hard).
-  - Within each difficulty band, tasks are drawn **round-robin over category** (e.g., `games`, `math`, `file_operations`).
+  - Within each difficulty band, tasks are drawn round-robin over category (e.g., `games`, `math`, `file_operations`).
 - Leakage control: the training and eval sets are checked for repo overlap before sampling.
 
 ## Baseline
@@ -33,6 +32,14 @@ Official DFlash drafter at 15 speculative tokens, measured on the frozen 40 with
 Acceptance falls as reasoning strength rises, from 4.345 at `low` to 3.797 at
 `xhigh`. Per-segment numbers, caveats and coverage:
 [benchmark/terminal_bench/README.md](benchmark/terminal_bench/README.md).
+
+| strength | calls | out_tok | accept_len | draft_rate | tok/s |
+|---|---:|---:|---:|---:|---:|
+| low | 350 | 56,664 | 4.345 | 0.223 | 174.2 |
+| medium | 369 | 140,552 | 4.034 | 0.202 | 166.4 |
+| high | 333 | 132,342 | 3.796 | 0.186 | 155.4 |
+| xhigh | 701 | 190,344 | 3.797 | 0.186 | 134.2 |
+| **pooled** | **1753** | **519,902** | **3.913** | **0.194** | **151.1** |
 
 ## Gathering Traces
 
