@@ -1,0 +1,157 @@
+{
+  "rounds": [
+    {
+      "phase": "benchmark",
+      "round": 0,
+      "concurrency": 1,
+      "started_at_unix": 1788827551.8850777,
+      "makespan_s": 1.3542248450003171,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        1.354174162000163
+      ],
+      "tokens_per_s": 378.07606461383455
+    },
+    {
+      "phase": "benchmark",
+      "round": 1,
+      "concurrency": 1,
+      "started_at_unix": 1788827553.2402117,
+      "makespan_s": 0.8966692980002335,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        0.8966296440003134
+      ],
+      "tokens_per_s": 571.0020418250862
+    },
+    {
+      "phase": "benchmark",
+      "round": 2,
+      "concurrency": 1,
+      "started_at_unix": 1788827554.137689,
+      "makespan_s": 1.0906767129999935,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        1.0906400410003698
+      ],
+      "tokens_per_s": 469.43332877411774
+    },
+    {
+      "phase": "benchmark",
+      "round": 3,
+      "concurrency": 1,
+      "started_at_unix": 1788827555.2291608,
+      "makespan_s": 1.0307550749998882,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        1.030719160999979
+      ],
+      "tokens_per_s": 496.7232395145428
+    },
+    {
+      "phase": "benchmark",
+      "round": 4,
+      "concurrency": 1,
+      "started_at_unix": 1788827556.2607274,
+      "makespan_s": 1.0109652220003227,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        1.0109285329999693
+      ],
+      "tokens_per_s": 506.44669950855797
+    },
+    {
+      "phase": "benchmark",
+      "round": 5,
+      "concurrency": 1,
+      "started_at_unix": 1788827557.272478,
+      "makespan_s": 0.7748644520002017,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        0.7748140540002169
+      ],
+      "tokens_per_s": 660.7607287679093
+    },
+    {
+      "phase": "benchmark",
+      "round": 6,
+      "concurrency": 1,
+      "started_at_unix": 1788827558.048152,
+      "makespan_s": 2.074019491999934,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        2.0739839639995807
+      ],
+      "tokens_per_s": 246.863639408851
+    },
+    {
+      "phase": "benchmark",
+      "round": 7,
+      "concurrency": 1,
+      "started_at_unix": 1788827560.1230226,
+      "makespan_s": 2.399667278999914,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        2.3996202929997708
+      ],
+      "tokens_per_s": 213.36291263403038
+    },
+    {
+      "phase": "benchmark",
+      "round": 8,
+      "concurrency": 1,
+      "started_at_unix": 1788827562.523614,
+      "makespan_s": 0.8187857620000614,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        0.8187500399999408
+      ],
+      "tokens_per_s": 625.3161984025336
+    },
+    {
+      "phase": "benchmark",
+      "round": 9,
+      "concurrency": 1,
+      "started_at_unix": 1788827563.3432662,
+      "makespan_s": 1.1460193310003888,
+      "requests": 1,
+      "errors": 0,
+      "output_tokens": 512,
+      "request_latencies_s": [
+        1.1459830110002258
+      ],
+      "tokens_per_s": 446.7638425898649
+    }
+  ],
+  "requests": 10,
+  "output_tokens": 5120,
+  "total_wave_makespan_s": 12.596647469001255,
+  "tokens_per_s": 406.4573540380223,
+  "throughput_definition": "sum(output_tokens) / sum(wave_makespan_s)",
+  "request_latency_p50_s": 1.0606796010001744,
+  "request_latency_p95_s": 2.3996202929997708,
+  "spec_metrics_requests": 10,
+  "num_spec_steps": 629,
+  "num_accepted_draft_tokens": 4548,
+  "num_draft_tokens": 9435,
+  "accept_len": 8.230524642289348,
+  "draft_acceptance_rate": 0.4820349761526232
+}

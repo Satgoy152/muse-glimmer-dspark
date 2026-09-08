@@ -1,0 +1,108 @@
+{
+  "status": "complete",
+  "created_at": "2026-09-08T00:32:21.405426+00:00",
+  "case": "long",
+  "concurrency": 1,
+  "rounds": 10,
+  "max_tokens": 512,
+  "warmup_tokens": 32,
+  "profile": true,
+  "base_url": "http://127.0.0.1:8002",
+  "timeout_s": 900,
+  "prompt_source": "/mnt/data/profiles/dflash2-20260908/prompts.json",
+  "prompt_source_sha256": "05636a39f79e0b99b936d8cf8e11a3d588020ca2c8a5b73b251642ef026fdcf3",
+  "prompts": [
+    {
+      "id": "long-00-1e776fb22cc6",
+      "token_count": 21805,
+      "sha256": "1e776fb22cc6f5cff9b98abd3932812d079049ef761adeaf57d28d4bbf5fa285"
+    },
+    {
+      "id": "long-01-ccd54646e6a5",
+      "token_count": 22197,
+      "sha256": "ccd54646e6a50bfe5884d14d95295fce6286f969be28c59a9ed0de4cdd1718e3"
+    },
+    {
+      "id": "long-02-c6c05e55d9ed",
+      "token_count": 22539,
+      "sha256": "c6c05e55d9edfcb4b1f0d811e46f26a7e679aff7a101368447f617bb8eeb61d2"
+    },
+    {
+      "id": "long-03-7cac1701a8ce",
+      "token_count": 22836,
+      "sha256": "7cac1701a8ce3bfdad2df01c0bc2a1cdec16f7f2f1d0afa796c53463d12e3e78"
+    },
+    {
+      "id": "long-04-d039b5dcd029",
+      "token_count": 21842,
+      "sha256": "d039b5dcd029e75567939da44e75abdba6a728238fb23121e4c4528cc32d9143"
+    },
+    {
+      "id": "long-05-a75de52d7835",
+      "token_count": 23222,
+      "sha256": "a75de52d7835fadf63f186180fb4dec5f778dc99329e7651caa3ffbad0c70105"
+    },
+    {
+      "id": "long-06-14ffa813c3a4",
+      "token_count": 22129,
+      "sha256": "14ffa813c3a4184cc14a411f1bfd00b0866fe0ec88949d6f368c82137299a644"
+    },
+    {
+      "id": "long-07-98811bee3d10",
+      "token_count": 21327,
+      "sha256": "98811bee3d10c2118c0b355a30a34da3cc9cb8b2b4824b1c43512f28b7d58315"
+    },
+    {
+      "id": "long-08-c40d98979165",
+      "token_count": 21417,
+      "sha256": "c40d9897916569cb35d766024d4ac65e2453df7abdb4d4206b09f6d1e71035cb"
+    },
+    {
+      "id": "long-09-815fee14cc6f",
+      "token_count": 22402,
+      "sha256": "815fee14cc6fad6f2ae4e59903dc29f0b2da5feca72362a627966995ffdaf960"
+    }
+  ],
+  "sampling": {
+    "temperature": 0,
+    "top_p": 1,
+    "top_k": -1,
+    "ignore_eos": true,
+    "stream": false
+  },
+  "workload": "One synchronized wave per round; prompt index = (round * concurrency + slot) % prompt_count",
+  "cache_policy": "All prompts primed with 32 output tokens at the measured concurrency; final warmup wave wraps if needed; server cache configuration unchanged",
+  "purpose": "Fixed-length runtime diagnostic; not a quality evaluation",
+  "model": "meta-models/Muse-Glimmer-30B",
+  "server_models": {
+    "object": "list",
+    "data": [
+      {
+        "id": "meta-models/Muse-Glimmer-30B",
+        "object": "model",
+        "created": 1788827541,
+        "owned_by": "vllm",
+        "root": "meta-models/Muse-Glimmer-30B",
+        "parent": null,
+        "max_model_len": 131072,
+        "permission": [
+          {
+            "id": "modelperm-bab7f2f39040de0c",
+            "object": "model_permission",
+            "created": 1788827541,
+            "allow_create_engine": false,
+            "allow_sampling": true,
+            "allow_logprobs": true,
+            "allow_search_indices": false,
+            "allow_view": true,
+            "allow_fine_tuning": false,
+            "organization": "*",
+            "group": null,
+            "is_blocking": false
+          }
+        ]
+      }
+    ]
+  },
+  "finished_at": "2026-09-08T00:32:49.997254+00:00"
+}

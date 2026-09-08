@@ -1,0 +1,40 @@
+{
+  "rounds": [
+    {
+      "phase": "profile",
+      "round": 0,
+      "concurrency": 10,
+      "started_at_unix": 1788827531.9478862,
+      "makespan_s": 9.341559326999686,
+      "requests": 10,
+      "errors": 0,
+      "output_tokens": 5120,
+      "request_latencies_s": [
+        1.242129863000173,
+        1.2681873200003793,
+        1.383125962000122,
+        5.720513269000094,
+        5.72220431300002,
+        5.757266915999935,
+        6.348685974000091,
+        6.367706554000051,
+        6.487355914000091,
+        9.34059686799992
+      ],
+      "tokens_per_s": 548.0883673458869
+    }
+  ],
+  "requests": 10,
+  "output_tokens": 5120,
+  "total_wave_makespan_s": 9.341559326999686,
+  "tokens_per_s": 548.0883673458869,
+  "throughput_definition": "sum(output_tokens) / sum(wave_makespan_s)",
+  "request_latency_p50_s": 5.739735614499978,
+  "request_latency_p95_s": 9.34059686799992,
+  "spec_metrics_requests": 10,
+  "num_spec_steps": 849,
+  "num_accepted_draft_tokens": 4292,
+  "num_draft_tokens": 12735,
+  "accept_len": 6.055359246171967,
+  "draft_acceptance_rate": 0.3370239497447978
+}

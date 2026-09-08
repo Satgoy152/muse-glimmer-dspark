@@ -1,0 +1,86 @@
+{
+  "rounds": [
+    {
+      "phase": "benchmark",
+      "round": 0,
+      "concurrency": 10,
+      "started_at_unix": 1788827570.5448315,
+      "makespan_s": 3.262898068999675,
+      "requests": 10,
+      "errors": 0,
+      "output_tokens": 5120,
+      "request_latencies_s": [
+        1.2367843789998005,
+        1.3094402279998576,
+        1.3339085220000015,
+        1.3846174309996968,
+        1.552081066000028,
+        1.5704188129998329,
+        1.6880967510001028,
+        1.8839864699998543,
+        3.0458324020000873,
+        3.2558336809997854
+      ],
+      "tokens_per_s": 1569.157200662927
+    },
+    {
+      "phase": "benchmark",
+      "round": 1,
+      "concurrency": 10,
+      "started_at_unix": 1788827573.8101628,
+      "makespan_s": 3.675720586999887,
+      "requests": 10,
+      "errors": 0,
+      "output_tokens": 5120,
+      "request_latencies_s": [
+        1.27203965300032,
+        1.2967288310001095,
+        1.3323464350000904,
+        1.423058210000363,
+        1.4496558509999886,
+        1.5547328340003332,
+        1.665755173999969,
+        1.8931141730004128,
+        2.97276592299977,
+        3.662470796999969
+      ],
+      "tokens_per_s": 1392.9241569960925
+    },
+    {
+      "phase": "benchmark",
+      "round": 2,
+      "concurrency": 10,
+      "started_at_unix": 1788827577.488223,
+      "makespan_s": 3.031903892000173,
+      "requests": 10,
+      "errors": 0,
+      "output_tokens": 5120,
+      "request_latencies_s": [
+        1.263418134999938,
+        1.2867754740000237,
+        1.31999576599992,
+        1.4134228220000296,
+        1.465493332999813,
+        1.5565482720003274,
+        1.6521248770000057,
+        1.886434353000368,
+        2.9867978409997704,
+        3.027767543000209
+      ],
+      "tokens_per_s": 1688.7078820372146
+    }
+  ],
+  "requests": 30,
+  "output_tokens": 15360,
+  "total_wave_makespan_s": 9.970522547999735,
+  "tokens_per_s": 1540.541122699882,
+  "throughput_definition": "sum(output_tokens) / sum(wave_makespan_s)",
+  "request_latency_p50_s": 1.5534069500001806,
+  "request_latency_p95_s": 3.2558336809997854,
+  "spec_metrics_requests": 30,
+  "num_spec_steps": 1957,
+  "num_accepted_draft_tokens": 13589,
+  "num_draft_tokens": 29355,
+  "accept_len": 7.943791517629024,
+  "draft_acceptance_rate": 0.4629194345086016
+}
