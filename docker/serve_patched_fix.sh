@@ -9,6 +9,10 @@
 # qwen3_dflash2.py falls back to scale=1.0 (a 5.1x logit error) and softcap=0.0.
 # The native z-lab checkpoint keeps its own dflash_config and is unaffected --
 # which is precisely the asymmetry this control removes.
+# Historical: kept as provenance for the scale-fix control. serve_patched.sh
+# now applies this patch inline, so new runs do not need this wrapper. The
+# patcher it calls is committed at patches/patch_algos.py; on the node it lived
+# at /mnt/data/patch_algos.py, which is the path below.
 set -euo pipefail
-python3 /mnt/data/patch_algos.py
+python3 "${PATCH_ALGOS:-/mnt/data/patch_algos.py}"
 exec bash "$(dirname "$0")/serve_patched.sh"
