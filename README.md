@@ -19,7 +19,7 @@ This project fine-tunes a speculator on curated on-policy coding and agentic tra
 - New training traces: [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) over SWE-Gym, repos disjoint from eval: [Satgoy152/Muse-Glimmer-SWE-Gym-2k](https://huggingface.co/datasets/Satgoy152/Muse-Glimmer-SWE-Gym-2k)
   - 2000 instances, balanced round-robin across SWE-Gym's 11 repos.
   - Every instance is verified with a pre-built docker image.
-- Eval: Terminal-Bench — [Satgoy152/Muse-Glimmer-Terminal-Bench-Eval](https://huggingface.co/datasets/Satgoy152/Muse-Glimmer-Terminal-Bench-Eval) 
+- Eval: Terminal-Bench — [Satgoy152/Muse-Glimmer-Terminal-Bench-Eval](https://huggingface.co/datasets/Satgoy152/Muse-Glimmer-Terminal-Bench-Eval)
   - 40 of 241 tasks, mixed across difficulty (11 easy / 20 medium / 9 hard).
   - Within each difficulty band, tasks are drawn round-robin over category (e.g., `games`, `math`, `file_operations`).
 - Leakage control: the training and eval sets are checked for repo overlap before sampling.

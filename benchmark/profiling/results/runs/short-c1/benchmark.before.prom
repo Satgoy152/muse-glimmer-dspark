@@ -619,7 +619,7 @@ http_requests_created{handler="/start_profile",method="POST",status="2xx"} 1.788
 http_requests_created{handler="/stop_profile",method="POST",status="2xx"} 1.788827475536775e+09
 http_requests_created{handler="/v1/models",method="GET",status="2xx"} 1.7888274894463274e+09
 http_requests_created{handler="/v1/completions",method="POST",status="2xx"} 1.7888274905586493e+09
-# HELP http_request_size_bytes Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# HELP http_request_size_bytes Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
 # TYPE http_request_size_bytes summary
 http_request_size_bytes_count{handler="/start_profile"} 1.0
 http_request_size_bytes_sum{handler="/start_profile"} 0.0
@@ -629,13 +629,13 @@ http_request_size_bytes_count{handler="/v1/models"} 1.0
 http_request_size_bytes_sum{handler="/v1/models"} 0.0
 http_request_size_bytes_count{handler="/v1/completions"} 10.0
 http_request_size_bytes_sum{handler="/v1/completions"} 120170.0
-# HELP http_request_size_bytes_created Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# HELP http_request_size_bytes_created Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
 # TYPE http_request_size_bytes_created gauge
 http_request_size_bytes_created{handler="/start_profile"} 1.788827475530257e+09
 http_request_size_bytes_created{handler="/stop_profile"} 1.788827475536793e+09
 http_request_size_bytes_created{handler="/v1/models"} 1.788827489446354e+09
 http_request_size_bytes_created{handler="/v1/completions"} 1.788827490558673e+09
-# HELP http_response_size_bytes Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# HELP http_response_size_bytes Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
 # TYPE http_response_size_bytes summary
 http_response_size_bytes_count{handler="/start_profile"} 1.0
 http_response_size_bytes_sum{handler="/start_profile"} 0.0
@@ -645,13 +645,13 @@ http_response_size_bytes_count{handler="/v1/models"} 1.0
 http_response_size_bytes_sum{handler="/v1/models"} 492.0
 http_response_size_bytes_count{handler="/v1/completions"} 10.0
 http_response_size_bytes_sum{handler="/v1/completions"} 11267.0
-# HELP http_response_size_bytes_created Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# HELP http_response_size_bytes_created Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
 # TYPE http_response_size_bytes_created gauge
 http_response_size_bytes_created{handler="/start_profile"} 1.7888274755302825e+09
 http_response_size_bytes_created{handler="/stop_profile"} 1.7888274755368128e+09
 http_response_size_bytes_created{handler="/v1/models"} 1.788827489446378e+09
 http_response_size_bytes_created{handler="/v1/completions"} 1.7888274905586982e+09
-# HELP http_request_duration_highr_seconds Latency with many buckets but no API specific labels. Made for more accurate percentile calculations. 
+# HELP http_request_duration_highr_seconds Latency with many buckets but no API specific labels. Made for more accurate percentile calculations.
 # TYPE http_request_duration_highr_seconds histogram
 http_request_duration_highr_seconds_bucket{le="0.01"} 3.0
 http_request_duration_highr_seconds_bucket{le="0.025"} 3.0
@@ -677,10 +677,10 @@ http_request_duration_highr_seconds_bucket{le="60.0"} 13.0
 http_request_duration_highr_seconds_bucket{le="+Inf"} 13.0
 http_request_duration_highr_seconds_count 13.0
 http_request_duration_highr_seconds_sum 3.001947122999809
-# HELP http_request_duration_highr_seconds_created Latency with many buckets but no API specific labels. Made for more accurate percentile calculations. 
+# HELP http_request_duration_highr_seconds_created Latency with many buckets but no API specific labels. Made for more accurate percentile calculations.
 # TYPE http_request_duration_highr_seconds_created gauge
 http_request_duration_highr_seconds_created 1.7888274435415974e+09
-# HELP http_request_duration_seconds Latency with only few buckets by handler. Made to be only used if aggregation by handler is important. 
+# HELP http_request_duration_seconds Latency with only few buckets by handler. Made to be only used if aggregation by handler is important.
 # TYPE http_request_duration_seconds histogram
 http_request_duration_seconds_bucket{handler="/start_profile",le="0.1",method="POST"} 1.0
 http_request_duration_seconds_bucket{handler="/start_profile",le="0.5",method="POST"} 1.0
@@ -706,7 +706,7 @@ http_request_duration_seconds_bucket{handler="/v1/completions",le="1.0",method="
 http_request_duration_seconds_bucket{handler="/v1/completions",le="+Inf",method="POST"} 10.0
 http_request_duration_seconds_count{handler="/v1/completions",method="POST"} 10.0
 http_request_duration_seconds_sum{handler="/v1/completions",method="POST"} 2.997880879999684
-# HELP http_request_duration_seconds_created Latency with only few buckets by handler. Made to be only used if aggregation by handler is important. 
+# HELP http_request_duration_seconds_created Latency with only few buckets by handler. Made to be only used if aggregation by handler is important.
 # TYPE http_request_duration_seconds_created gauge
 http_request_duration_seconds_created{handler="/start_profile",method="POST"} 1.7888274755303168e+09
 http_request_duration_seconds_created{handler="/stop_profile",method="POST"} 1.7888274755368347e+09

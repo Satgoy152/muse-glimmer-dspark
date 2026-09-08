@@ -613,21 +613,21 @@ http_requests_total{handler="/v1/models",method="GET",status="2xx"} 2.0
 # HELP http_requests_created Total number of requests by method, status and handler.
 # TYPE http_requests_created gauge
 http_requests_created{handler="/v1/models",method="GET",status="2xx"} 1.7887606016079957e+09
-# HELP http_request_size_bytes Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# HELP http_request_size_bytes Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
 # TYPE http_request_size_bytes summary
 http_request_size_bytes_count{handler="/v1/models"} 2.0
 http_request_size_bytes_sum{handler="/v1/models"} 0.0
-# HELP http_request_size_bytes_created Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# HELP http_request_size_bytes_created Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
 # TYPE http_request_size_bytes_created gauge
 http_request_size_bytes_created{handler="/v1/models"} 1.7887606016080227e+09
-# HELP http_response_size_bytes Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# HELP http_response_size_bytes Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
 # TYPE http_response_size_bytes summary
 http_response_size_bytes_count{handler="/v1/models"} 2.0
 http_response_size_bytes_sum{handler="/v1/models"} 984.0
-# HELP http_response_size_bytes_created Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# HELP http_response_size_bytes_created Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
 # TYPE http_response_size_bytes_created gauge
 http_response_size_bytes_created{handler="/v1/models"} 1.7887606016080472e+09
-# HELP http_request_duration_highr_seconds Latency with many buckets but no API specific labels. Made for more accurate percentile calculations. 
+# HELP http_request_duration_highr_seconds Latency with many buckets but no API specific labels. Made for more accurate percentile calculations.
 # TYPE http_request_duration_highr_seconds histogram
 http_request_duration_highr_seconds_bucket{le="0.01"} 2.0
 http_request_duration_highr_seconds_bucket{le="0.025"} 2.0
@@ -653,10 +653,10 @@ http_request_duration_highr_seconds_bucket{le="60.0"} 2.0
 http_request_duration_highr_seconds_bucket{le="+Inf"} 2.0
 http_request_duration_highr_seconds_count 2.0
 http_request_duration_highr_seconds_sum 0.0014447569992626086
-# HELP http_request_duration_highr_seconds_created Latency with many buckets but no API specific labels. Made for more accurate percentile calculations. 
+# HELP http_request_duration_highr_seconds_created Latency with many buckets but no API specific labels. Made for more accurate percentile calculations.
 # TYPE http_request_duration_highr_seconds_created gauge
 http_request_duration_highr_seconds_created 1.7887605911120894e+09
-# HELP http_request_duration_seconds Latency with only few buckets by handler. Made to be only used if aggregation by handler is important. 
+# HELP http_request_duration_seconds Latency with only few buckets by handler. Made to be only used if aggregation by handler is important.
 # TYPE http_request_duration_seconds histogram
 http_request_duration_seconds_bucket{handler="/v1/models",le="0.1",method="GET"} 2.0
 http_request_duration_seconds_bucket{handler="/v1/models",le="0.5",method="GET"} 2.0
@@ -664,7 +664,7 @@ http_request_duration_seconds_bucket{handler="/v1/models",le="1.0",method="GET"}
 http_request_duration_seconds_bucket{handler="/v1/models",le="+Inf",method="GET"} 2.0
 http_request_duration_seconds_count{handler="/v1/models",method="GET"} 2.0
 http_request_duration_seconds_sum{handler="/v1/models",method="GET"} 0.0014447569992626086
-# HELP http_request_duration_seconds_created Latency with only few buckets by handler. Made to be only used if aggregation by handler is important. 
+# HELP http_request_duration_seconds_created Latency with only few buckets by handler. Made to be only used if aggregation by handler is important.
 # TYPE http_request_duration_seconds_created gauge
 http_request_duration_seconds_created{handler="/v1/models",method="GET"} 1.7887606016080809e+09
 # HELP vllm:tool_call_parser_invocations_total Total number of ToolParser invocations. Non-streaming increments once per choice; streaming increments once per delta.
