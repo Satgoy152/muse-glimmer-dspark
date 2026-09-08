@@ -159,9 +159,15 @@ def main():
     concs = sorted(concs)
 
     lines = []
-    W = ("| drafter | calls | out tok | accept_len (step-w) | accept_len (per-req) | "
-         "t_step ms | TPOT ms | decode tok/s | vs no-spec | TTFT mean s | wall tok/s |")
-    SEP = "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+    # `err` is not decoration. Requests carry no max_tokens, greedy decoding can
+    # run away into a repetition loop, and replay.py times a call out at 900 s --
+    # which a 55 tok/s no-spec server hits at ~49K tokens and a 200 tok/s drafter
+    # does not. An error count that differs across drafters in the same cell
+    # means the cell is not comparing the same call set.
+    W = ("| drafter | calls | err | out tok | max ctok | accept_len (step-w) | "
+         "accept_len (per-req) | t_step ms | TPOT ms | decode tok/s | vs no-spec | "
+         "TTFT mean s | wall tok/s |")
+    SEP = "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
 
     for c in concs:
         for b in BUCKETS + ["full"]:
@@ -177,7 +183,8 @@ def main():
                 sp = (s.get("decode_tok_s", 0) / den) if den else None
                 wall = v["out_tok"] / v["meta"]["wall_s"] if v["meta"].get("wall_s") else None
                 lines.append(
-                    f"| `{k}` | {v['n_calls']} | {v['out_tok']:,} | "
+                    f"| `{k}` | {v['n_calls']} | {v['meta'].get('errored', 0)} | "
+                    f"{v['out_tok']:,} | {v['max_ctok']:,} | "
                     f"{fmt(s.get('accept_len_sw'),1)} | {fmt(v['accept_len_pr'],1)} | "
                     f"{fmt(s.get('t_step_ms'),1)} | {fmt(s.get('tpot_ms'),1)} | "
                     f"{fmt(s.get('decode_tok_s'),1,1)} | "
