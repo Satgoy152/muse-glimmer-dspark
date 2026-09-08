@@ -16,7 +16,8 @@ anything at this sample size.
 import argparse, json, math, random
 from collections import defaultdict
 
-P = json.load(open("/mnt/data/eval/sweep/percall.json"))
+import os
+P = json.load(open(os.environ.get("SWEEP_ROOT", "/mnt/data/eval/sweep") + "/percall.json"))
 BL = {"b64_128": "64-128", "b128_256": "128-256", "b256_1K": "256-1K",
       "bge1K": ">=1K", "full": "full set"}
 

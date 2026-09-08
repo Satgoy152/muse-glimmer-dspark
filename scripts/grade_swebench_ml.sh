@@ -7,6 +7,8 @@
 # benchmark/analysis/wilson.py is what enforces that.
 set -uo pipefail
 G=/mnt/data/gradevenv/bin/python
+export HF_HOME=/mnt/data/hf
+export HF_TOKEN="$(cat /mnt/data/.hf_token 2>/dev/null)"
 SUBSET="${SUBSET:-/mnt/data/bench/swebench_ml}"
 RUNS="${RUNS:-/mnt/data/runs/mlonpolicy}"
 N=$(wc -l < "$SUBSET/test.jsonl")
@@ -18,14 +20,20 @@ cd /mnt/data/runs
 # shows two places where output preservation does not hold in practice, which
 # makes this a test rather than a formality.
 for d in /mnt/data/runs/swebench-ml "$RUNS"/*/; do
+  [ -d "$d" ] || continue
   L=$(basename "$d")
   [ "$L" = "swebench-ml" ] && L="target-only"
   [ -s "$d/preds.json" ] || { echo "skip $L: no preds.json"; continue; }
+  # Grading is CPU and docker only, so it overlaps the GPU sweep; keep the
+  # worker count low enough that it does not starve the agent runs sharing
+  # this box.
+  [ -s "/mnt/data/runs/openai__meta-models__Muse-Glimmer-30B.ml-$L.json" ] \
+    && { echo "skip $L: already graded"; continue; }
   echo "=== grading $L ==="
   $G -m swebench.harness.run_evaluation \
     --dataset_name swe-bench/SWE-Bench_Multilingual --split test \
     --predictions_path "$d/preds.json" --run_id "ml-$L" \
-    --max_workers 4 --cache_level env --timeout 1800 \
+    --max_workers "${WORKERS:-3}" --timeout 1800 \
     2>&1 | tail -20
 done
 

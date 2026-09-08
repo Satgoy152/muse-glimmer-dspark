@@ -18,7 +18,8 @@ Per-request excludes calls with fewer than 5 spec steps on the grounds that a
 import argparse, glob, hashlib, json, math, os, re
 from collections import defaultdict
 
-ROOT = "/mnt/data/eval/sweep"
+import os
+ROOT = os.environ.get("SWEEP_ROOT", "/mnt/data/eval/sweep")
 BUCKETS = ["b64_128", "b128_256", "b256_1K", "bge1K"]
 BLABEL = {"b64_128": "64-128", "b128_256": "128-256",
           "b256_1K": "256-1K", "bge1K": ">=1K", "full": "full set"}
@@ -142,8 +143,8 @@ def fmt(x, w=8, p=3):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--json-out", default="/mnt/data/eval/sweep/report.json")
-    ap.add_argument("--md-out", default="/mnt/data/eval/sweep/report.md")
+    ap.add_argument("--json-out", default=f"{ROOT}/report.json")
+    ap.add_argument("--md-out", default=f"{ROOT}/report.md")
     a = ap.parse_args()
     cells = collect()
 
@@ -202,7 +203,7 @@ def main():
                for k, v in cells.items()}, open(a.json_out, "w"), indent=1, default=str)
     # per-call dump for the paired bootstrap
     json.dump({k: v["percall"] for k, v in cells.items()},
-              open("/mnt/data/eval/sweep/percall.json", "w"))
+              open(f"{ROOT}/percall.json", "w"))
     print(md)
     print(f"\n{len(cells)} cells -> {a.md_out}, {a.json_out}")
 

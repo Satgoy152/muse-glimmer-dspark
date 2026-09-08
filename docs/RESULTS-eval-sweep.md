@@ -454,6 +454,10 @@ that the two orderings disagree and neither is resolved.
 
 ## Task 2 — SWE-bench Multilingual
 
+**Selection, recording, resolved rate and 6 of 8 replays complete.** Two replay
+drafters and two controls were still running when this was written; each is
+marked below.
+
 ### Task selection and disjointness
 
 32 instances, selected by `scripts/build_swebench_ml.py` from
@@ -526,6 +530,109 @@ upstream port and never touches the proxy, the converter drops any row that is
 not an agent call (no tools, no reasoning strength, or an errored response), and
 `VALIDATE_FIRST=1` records one instance and refuses to launch the other 31
 unless that instance produced replayable calls.
+
+### Frozen-replay acceptance — the transfer result
+
+All drafters replay the same 2,742 recorded calls, paired on `replay_of`,
+temperature 1.0 / top_k 64 / concurrency 10 / `NUM_SPEC_TOKENS` 15 — the same
+settings as the Terminal-Bench full-set rows, so the two benchmarks are directly
+comparable to each other (and, unlike task 1, to `docs/RESULTS-paired.md`).
+
+**Six of eight drafters complete;** `dspark-community` and `dspark-run-b-49k`
+were still running when this was written.
+
+| drafter | accept_len (step-w) | accept_len (per-req) | t_step ms | decode tok/s | vs no-spec | TTFT s |
+|---|---:|---:|---:|---:|---:|---:|
+| *no speculation* | 1.000 | — | 19.42 | 51.8 | 1.00x | 0.209 |
+| `dflash-official` | 4.708 | 6.483 | 36.88 | 127.0 | 2.45x | 0.316 |
+| `dflash2` | 4.796 | 6.362 | 37.87 | 126.7 | 2.45x | 0.321 |
+| **ours `dflash2-run-d-mid`** | **5.081** | **7.500** | 37.10 | **136.2** | **2.63x** | 0.388 |
+| **ours `dflash2-run-d-final`** | **5.058** | **7.549** | 37.80 | 133.0 | **2.57x** | 0.319 |
+| ours `dspark-run-a-32k` | 4.780 | 7.286 | 37.86 | 124.7 | 2.41x | 0.320 |
+
+Paired bootstrap against `dflash2`, 2,000 resamples, n=2,742:
+
+| A vs `dflash2` | step-w Δ | 95% CI | per-req Δ | win |
+|---|---:|---|---:|---:|
+| ours `dflash2-run-d-mid` | **+0.300** | **[+0.189, +0.418]** | +1.243 ±0.094 | 71% |
+| ours `dflash2-run-d-final` | **+0.272** | **[+0.160, +0.387]** | +1.311 ±0.089 | 73% |
+| ours `dspark-run-a-32k` | +0.008 | [−0.098, +0.112] | +1.041 ±0.093 | 66% |
+| `dflash-official` | −0.075 | [−0.177, +0.022] | +0.058 ±0.068 | 51% |
+
+**Both DFlash2 fine-tunes beat native `dflash2` on this benchmark, on both
+poolings, with intervals clear of zero.** On Terminal-Bench at identical
+settings the same checkpoints are −0.09 step-weighted and not separable from
+zero. The fine-tune transfers *better* to the benchmark it was never trained on
+than to the one already being used to evaluate it.
+
+The throughput column agrees but resolves less: 136.2 against 126.7 tok/s is
++7.5%, only just past the ~6% that `t_step` run-to-run movement at concurrency 10
+allows anyone to quote. The mechanism is not in dispute though — `t_step` differs
+by 2% (37.10 vs 37.87) while acceptance differs by 6%, so the gain is acceptance,
+not a cheaper drafter.
+
+**Caveat: this comparison has no same-drafter repeat on this call set yet.** The
+Terminal-Bench repeat control at concurrency 10 is +0.010 [−0.101, +0.120], which
+would put +0.300 well clear — but borrowing a noise floor from a different
+workload is exactly the shortcut this document has twice found to be wrong. A
+`dflash2` repeat over the same 2,742 calls is queued.
+
+### Why it transfers better — the reasoning-share prediction holds
+
+`docs/RESULTS-paired.md` concluded that the fine-tune improved the
+command-heavy, low-reasoning half of a turn, and that Terminal-Bench decodes
+mostly the other half. That predicts the gain should appear on a benchmark whose
+reasoning share sits nearer the training corpus. Measured on the generated
+characters, by the same method:
+
+| corpus | reasoning share | turns with no reasoning at all |
+|---|---:|---:|
+| training (SWE-Gym) | 56.8% | 11.6% |
+| **SWE-bench Multilingual** | **62.9%** | **11.3%** |
+| Terminal-Bench | 75.3% | 2.2% |
+
+SWE-bench Multilingual sits near the training corpus and far from Terminal-Bench,
+and its no-reasoning share (11.3%) is almost exactly training's (11.6%). The
+fine-tune's step-weighted gain over `dflash2` is +0.300 here and −0.09 there.
+
+**These 32 instances were selected for repository disjointness, not for reasoning
+share** — the share was measured afterwards — and the prediction was written down
+in `RESULTS-paired.md` before this benchmark was recorded. That is stronger than
+a post-hoc fit. It is still two benchmarks and a training corpus: a consistent
+direction, not a dose-response curve. A third point (the SWE-Gym holdout, which
+should sit at the training end) is queued.
+
+### Resolved rate
+
+On-policy agent runs over the same 32 instances, graded with the SWE-bench
+harness (`swebench` 5.0.2). The denominator is all 32 — an instance whose agent
+produced nothing is unresolved, not absent.
+
+| arm | resolved | n | rate | 95% Wilson | empty patches |
+|---|---:|---:|---:|---|---:|
+| target model only | 13 | 32 | 40.6% | [25.5%, 57.7%] | 16 |
+| ours `dspark-run-a-32k` | 13 | 32 | 40.6% | [25.5%, 57.7%] | 13 |
+| ours `dflash2-run-d-mid` | 12 | 32 | 37.5% | [22.9%, 54.8%] | 13 |
+| `dflash2` | 6 | 32 | 18.8% | [8.9%, 35.3%] | 19 |
+
+**No difference here is quotable, and the table should not be read as one.**
+Every interval overlaps every other. Three of the four arms sit at 12–13 and only
+`dflash2` is low, which is the wrong shape for a drafter effect — if speculation
+were costing task resolution, all three drafters would be low, not one.
+
+The first two arms measured were target-only (13) and `dflash2` (6), paired
+exact McNemar p=0.065, and that pair on its own looks like a finding. It is the
+same trap task 3 turned on: **both arms are single stochastic rollouts at
+temperature 1.0, so two runs of the same model differ by construction and
+nothing here says by how much.** A second target-only rollout is queued purely to
+measure that floor. Until it lands, no delta in this table is interpretable.
+
+Two further limits, independent of any of that. Between 13 and 19 of the 32
+predictions in every arm are **empty patches**, so most of the denominator is the
+agent never producing a patch at all; and the agent hits its 100-step limit on
+roughly half the tasks. The ceiling on this sample was 16/32 before grading
+began. This is a measurement of a 30B model on nine-language repositories at a
+100-step budget at least as much as it is a measurement of any drafter.
 
 ## Task 3 — Terminal-Bench replay repeats
 
