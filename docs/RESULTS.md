@@ -1,5 +1,9 @@
 # All speculator results to date
 
+See [`RESULTS-turn-length.md`](RESULTS-turn-length.md) for the consolidated
+turn-length, reasoning-share, later-checkpoint, and length-aligned throughput
+analysis.
+
 Everything measured on the preemptible 1x H200 node against target
 `meta-models/Muse-Glimmer-30B` (BF16), `num_speculative_tokens=15` (16-token
 block), vLLM `specd:latest`. `accept_len = 1 + accepted/steps`, pooled.
