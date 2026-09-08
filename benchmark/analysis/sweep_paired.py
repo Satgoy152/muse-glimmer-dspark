@@ -57,13 +57,20 @@ def compare(A, B, minsteps=5):
         mu = sum(dm) / len(dm)
         sd = math.sqrt(sum((x - mu) ** 2 for x in dm) / (len(dm) - 1))
         ci = 1.96 * sd / math.sqrt(len(dm))
-        w = sum(1 for x in dm if x > 0)
     else:
-        mu = ci = float("nan"); w = 0
+        mu = ci = float("nan")
+    # Ties are excluded from the win rate, as in macro.py. Under greedy a large
+    # share of calls are byte-identical on both sides and score exactly zero;
+    # counting those as losses put the repeat control at a 6% "win rate" when it
+    # was in fact winning half of the calls that differed at all.
+    w = sum(1 for x in dm if x > 0)
+    l = sum(1 for x in dm if x < 0)
+    tie = len(dm) - w - l
     return dict(n=len(ids), sw_a=1 + sum(x[0] for x in ka) / max(sum(x[1] for x in ka), 1),
                 sw_b=1 + sum(x[0] for x in kb) / max(sum(x[1] for x in kb), 1),
                 d=d, lo=lo, hi=hi, n_pr=len(dm), pr_d=mu, pr_ci=ci,
-                win=(w / len(dm) if dm else float("nan")))
+                win=(w / (w + l) if (w + l) else float("nan")),
+                tie=(tie / len(dm) if dm else float("nan")))
 
 
 def main():
@@ -88,8 +95,10 @@ def main():
         print(f"\n== output bucket {BL.get(bucket, bucket)}, concurrency {conc[1:]} "
               f"-- A vs {a.ref} (greedy) ==")
         print(f"{'A':<24}{'n':>6}{'sw A':>9}{'sw B':>9}{'sw delta':>10}"
-              f"{'95% CI':>22}{'per-req delta':>15}{'win':>7}")
-        rows = [(k, v) for k, v in sorted(by.items()) if k != ref]
+              f"{'95% CI':>22}{'per-req delta':>15}{'win':>7}{'tied':>7}")
+        # no-spec has accept_len 1 by definition; pairing it against a drafter
+        # measures nothing but the definition.
+        rows = [(k, v) for k, v in sorted(by.items()) if k != ref and k[0] != "nospec"]
         # put the repeat control last so it reads as the yardstick
         rows.sort(key=lambda kv: (kv[0][0] == a.ref, kv[0]))
         for (label, rep), pc in rows:
@@ -102,7 +111,7 @@ def main():
             ci = f"[{r['lo']:+.3f}, {r['hi']:+.3f}]"
             pr = f"{r['pr_d']:+.3f}+-{r['pr_ci']:.3f}"
             print(f"{tag:<24}{r['n']:>6}{r['sw_a']:>9.3f}{r['sw_b']:>9.3f}"
-                  f"{r['d']:>+10.3f}{ci:>22}{pr:>15}{r['win']:>7.0%}")
+                  f"{r['d']:>+10.3f}{ci:>22}{pr:>15}{r['win']:>7.0%}{r['tie']:>7.0%}")
 
 
 if __name__ == "__main__":
