@@ -42,7 +42,7 @@ window per case. These six phases cover 99.65% of kernel time in every case.
 | phase | short-c1 | short-c10 | long-c1 | long-c10 |
 |---|---|---|---|---|
 | target forward (full CUDA graph) | 82.9% | 82.9% | 83.0% | 83.7% |
-| draft forward (full CUDA graph, 15 steps) | 12.1% | 12.1% | 12.0% | 11.5% |
+| draft forward (full CUDA graph, one pass) | 12.1% | 12.1% | 12.0% | 11.5% |
 | target LM head | 3.5% | 3.4% | 3.5% | 3.3% |
 | draft feature projection (eager) | 0.62% | 0.55% | 0.61% | 0.53% |
 | draft context KV insert (eager) | 0.30% | 0.35% | 0.29% | 0.33% |
@@ -51,6 +51,13 @@ window per case. These six phases cover 99.65% of kernel time in every case.
 The split barely moves across a 10x concurrency change and a 10x context-length
 change. **Target verification dominates; the entire drafter is about an eighth
 of GPU time.**
+
+The drafter proposes the whole 16-token block in a **single** forward pass, not
+15 sequential ones: the draft graph is launched once per engine step and
+contains 115 kernels, about 23 per drafter layer. Fifteen sequential passes
+would be roughly 1700 kernels, and 115/15 = 7.7 kernels per pass is impossible
+for a 5-layer model. This is what makes a second draft pass cheap -- see
+`docs/DECISION-second-draft-pass.md`.
 
 The two eager phases the earlier handoff flagged as suspects -- draft context KV
 insertion and feature projection -- together account for under 1% of GPU time.
