@@ -1,0 +1,39 @@
+{
+ "name": "dspark-run-a-32k",
+ "task": "HumanEval",
+ "trace": "/mnt/data/traces/he-dspark-run-a-32k/gen.jsonl",
+ "calls": 164,
+ "errored": 0,
+ "no_spec_block": 0,
+ "concurrency": [
+  1
+ ],
+ "temperature": [
+  0.0
+ ],
+ "accept_len": 4.5405,
+ "accept_len_server": 4.5405,
+ "accept_len_delta": 0.0,
+ "draft_rate": 0.236,
+ "out_tok": 187124,
+ "max_completion_tokens": 2048,
+ "median_completion_tokens": 1024,
+ "finish_reason": {
+  "stop": 144,
+  "length": 20
+ },
+ "ttft_p50": 3.403,
+ "e2e_p50": 4.182,
+ "num_spec_steps": 41295,
+ "num_accepted": 146205,
+ "num_drafted": 619425,
+ "pass1": 0.878,
+ "pass1_n": 164,
+ "pass1_outcomes": {
+  "pass": 144,
+  "fail:TypeError": 1,
+  "fail:NameError": 2,
+  "fail:AssertionError": 14,
+  "fail:SyntaxError": 3
+ }
+}

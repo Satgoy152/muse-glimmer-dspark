@@ -1,0 +1,39 @@
+{
+ "name": "dflash2",
+ "task": "HumanEval",
+ "trace": "/mnt/data/traces/he-dflash2/gen.jsonl",
+ "calls": 164,
+ "errored": 0,
+ "no_spec_block": 0,
+ "concurrency": [
+  1
+ ],
+ "temperature": [
+  0.0
+ ],
+ "accept_len": 5.7478,
+ "accept_len_server": 5.7478,
+ "accept_len_delta": 0.0,
+ "draft_rate": 0.3165,
+ "out_tok": 187116,
+ "max_completion_tokens": 2048,
+ "median_completion_tokens": 1024,
+ "finish_reason": {
+  "stop": 144,
+  "length": 20
+ },
+ "ttft_p50": 2.495,
+ "e2e_p50": 3.287,
+ "num_spec_steps": 32567,
+ "num_accepted": 154620,
+ "num_drafted": 488505,
+ "pass1": 0.878,
+ "pass1_n": 164,
+ "pass1_outcomes": {
+  "pass": 144,
+  "fail:TypeError": 1,
+  "fail:NameError": 2,
+  "fail:AssertionError": 15,
+  "fail:SyntaxError": 2
+ }
+}

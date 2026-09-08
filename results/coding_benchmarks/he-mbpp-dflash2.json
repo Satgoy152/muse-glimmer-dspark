@@ -1,0 +1,41 @@
+{
+ "name": "mbpp-dflash2",
+ "task": "MBPP",
+ "trace": "/mnt/data/traces/he-mbpp-dflash2/gen.jsonl",
+ "calls": 500,
+ "errored": 0,
+ "no_spec_block": 0,
+ "concurrency": [
+  1
+ ],
+ "temperature": [
+  0.0
+ ],
+ "accept_len": 5.4362,
+ "accept_len_server": 5.4362,
+ "accept_len_delta": 0.0,
+ "draft_rate": 0.2957,
+ "out_tok": 628108,
+ "max_completion_tokens": 2048,
+ "median_completion_tokens": 1142,
+ "finish_reason": {
+  "stop": 367,
+  "length": 133
+ },
+ "ttft_p50": 2.621,
+ "e2e_p50": 3.762,
+ "num_spec_steps": 115610,
+ "num_accepted": 512869,
+ "num_drafted": 1734150,
+ "pass1": 0.712,
+ "pass1_n": 500,
+ "pass1_outcomes": {
+  "pass": 356,
+  "fail:SyntaxError": 126,
+  "fail:NameError": 2,
+  "fail:RecursionError": 2,
+  "fail:AssertionError": 11,
+  "fail:ImportError": 2,
+  "fail:IndentationError": 1
+ }
+}

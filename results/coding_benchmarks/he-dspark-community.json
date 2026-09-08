@@ -1,0 +1,40 @@
+{
+ "name": "dspark-community",
+ "task": "HumanEval",
+ "trace": "/mnt/data/traces/he-dspark-community/gen.jsonl",
+ "calls": 164,
+ "errored": 0,
+ "no_spec_block": 0,
+ "concurrency": [
+  1
+ ],
+ "temperature": [
+  0.0
+ ],
+ "accept_len": 4.6581,
+ "accept_len_server": 4.6581,
+ "accept_len_delta": 0.0,
+ "draft_rate": 0.2439,
+ "out_tok": 187065,
+ "max_completion_tokens": 2048,
+ "median_completion_tokens": 1024,
+ "finish_reason": {
+  "stop": 145,
+  "length": 19
+ },
+ "ttft_p50": 3.178,
+ "e2e_p50": 4.09,
+ "num_spec_steps": 40223,
+ "num_accepted": 147140,
+ "num_drafted": 603345,
+ "pass1": 0.878,
+ "pass1_n": 164,
+ "pass1_outcomes": {
+  "pass": 144,
+  "fail:TypeError": 1,
+  "fail:NameError": 2,
+  "fail:AssertionError": 15,
+  "fail:SyntaxError": 1,
+  "timeout": 1
+ }
+}

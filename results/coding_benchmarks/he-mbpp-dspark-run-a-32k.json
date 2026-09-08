@@ -1,0 +1,41 @@
+{
+ "name": "mbpp-dspark-run-a-32k",
+ "task": "MBPP",
+ "trace": "/mnt/data/traces/he-mbpp-dspark-run-a-32k/gen.jsonl",
+ "calls": 500,
+ "errored": 0,
+ "no_spec_block": 0,
+ "concurrency": [
+  1
+ ],
+ "temperature": [
+  0.0
+ ],
+ "accept_len": 4.44,
+ "accept_len_server": 4.44,
+ "accept_len_delta": 0.0,
+ "draft_rate": 0.2293,
+ "out_tok": 628108,
+ "max_completion_tokens": 2048,
+ "median_completion_tokens": 1142,
+ "finish_reason": {
+  "stop": 367,
+  "length": 133
+ },
+ "ttft_p50": 3.282,
+ "e2e_p50": 4.778,
+ "num_spec_steps": 141736,
+ "num_accepted": 487575,
+ "num_drafted": 2126040,
+ "pass1": 0.712,
+ "pass1_n": 500,
+ "pass1_outcomes": {
+  "pass": 356,
+  "fail:SyntaxError": 125,
+  "fail:NameError": 2,
+  "fail:RecursionError": 2,
+  "fail:AssertionError": 11,
+  "fail:IndentationError": 2,
+  "fail:ImportError": 2
+ }
+}

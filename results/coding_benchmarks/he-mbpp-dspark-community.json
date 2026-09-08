@@ -1,0 +1,41 @@
+{
+ "name": "mbpp-dspark-community",
+ "task": "MBPP",
+ "trace": "/mnt/data/traces/he-mbpp-dspark-community/gen.jsonl",
+ "calls": 500,
+ "errored": 0,
+ "no_spec_block": 0,
+ "concurrency": [
+  1
+ ],
+ "temperature": [
+  0.0
+ ],
+ "accept_len": 4.5279,
+ "accept_len_server": 4.5279,
+ "accept_len_delta": 0.0,
+ "draft_rate": 0.2352,
+ "out_tok": 628121,
+ "max_completion_tokens": 2048,
+ "median_completion_tokens": 1142,
+ "finish_reason": {
+  "stop": 367,
+  "length": 133
+ },
+ "ttft_p50": 3.206,
+ "e2e_p50": 4.653,
+ "num_spec_steps": 138936,
+ "num_accepted": 490146,
+ "num_drafted": 2084040,
+ "pass1": 0.71,
+ "pass1_n": 500,
+ "pass1_outcomes": {
+  "pass": 355,
+  "fail:SyntaxError": 126,
+  "fail:NameError": 2,
+  "fail:RecursionError": 2,
+  "fail:AssertionError": 11,
+  "fail:IndentationError": 2,
+  "fail:ImportError": 2
+ }
+}

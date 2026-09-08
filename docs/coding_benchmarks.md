@@ -219,12 +219,32 @@ generation is cut at the cap. Among the 144 cleanly-terminated generations,
 pass@1 is 142/144 = 0.986. The headline 0.878 keeps the standard 164
 denominator; the gap between the two is the cap plus the parser, not the model.
 
-**3. Client-side TTFT/TPOT are invalid here, as suspected.** Client TTFT p50 is
-3.0 s against an e2e p50 of 3.8 s (ratio 0.81) — the parser buffering again.
-Server-side histograms put TTFT p50 at 0.044 s. vLLM's ITL/TPOT buckets are too
-coarse to separate the drafters (all five read ITL p50 0.0175), so the tok/s
-column above — output tokens over summed e2e latency at concurrency 1 — is the
-usable speed comparison. `dflash2` is 1.16× `dflash-official`.
+**3. Client-side TTFT/TPOT are invalid on both tasks, as suspected.** Median
+`ttft/e2e` is 0.86–0.88 on all ten runs — the first delta arrives around 87% of
+the way through the response, which is the tool-call parser buffering, not a
+real time-to-first-token. It is a systematic delay rather than a total
+collapse: only 2–3% of calls land within 5% of their own e2e (the
+Terminal-Bench workload, where nearly every call ends in tool_calls, collapses
+much harder at 86.6%).
+
+Server-side histograms are recorded inside the engine, before the parser, and
+are unaffected:
+
+| task | TTFT p50 | TTFT p90 | ITL p50 | TPOT p50 |
+|---|---|---|---|---|
+| HumanEval | 0.043–0.046 s | 0.057–0.058 s | 0.0175 | 0.0050 |
+| MBPP | 0.035–0.036 s | 0.054–0.055 s | 0.0175 | 0.0050 |
+
+Two orders of magnitude below the client-side figure, which settles it. But
+vLLM's ITL/TPOT buckets are too coarse to separate drafters — all ten runs read
+an identical ITL p50 of 0.0175 and TPOT p50 of 0.0050 — so **server-side
+latency cannot rank these drafters either**. The tok/s column in the results
+tables (output tokens over summed e2e latency at concurrency 1) is the usable
+speed comparison: `dflash2` is 1.16× `dflash-official` on HumanEval and 1.11×
+on MBPP.
+
+Regenerate with `benchmark/prom_latency.py <run>.prom ...` for the server side
+and `benchmark/humaneval/analyze.py` for the client-side validity check.
 
 **4. Scorer validated against canonical solutions** before use: HumanEval
 164/164 pass, MBPP 497/500. The 3 MBPP failures are defects in the dataset's
@@ -262,4 +282,10 @@ model emitted 0 reasoning tokens at its served default.
 
 - driver `benchmark/humaneval/gen.py`, scorer `benchmark/humaneval/metrics.py`
 - MBPP prep `benchmark/humaneval/prep_mbpp.py`
+- whole-sweep driver `scripts/sweep_coding_bench.sh HumanEval|MBPP`
+- cross-drafter analysis `benchmark/humaneval/analyze.py` — regenerates every
+  comparison in this document (acceptance sensitivity, output identity,
+  truncation, client-latency validity) from the traces
+- server-side latency `benchmark/prom_latency.py`
+- per-drafter result JSONs committed under `results/coding_benchmarks/`
 - traces `/mnt/data/traces/he-<name>/gen.jsonl` and `he-mbpp-<name>/`, results `/mnt/data/eval/he-<name>.json` and `he-mbpp-<name>.json`
