@@ -12,8 +12,14 @@ RUNS="${RUNS:-/mnt/data/runs/mlonpolicy}"
 N=$(wc -l < "$SUBSET/test.jsonl")
 cd /mnt/data/runs
 
-for d in "$RUNS"/*/; do
+# The target-only recording run is graded too, and it is the arm that matters
+# most: speculative decoding is supposed to be output-preserving, so a drafter's
+# resolved rate should match the target's. docs/RESULTS-eval-sweep.md already
+# shows two places where output preservation does not hold in practice, which
+# makes this a test rather than a formality.
+for d in /mnt/data/runs/swebench-ml "$RUNS"/*/; do
   L=$(basename "$d")
+  [ "$L" = "swebench-ml" ] && L="target-only"
   [ -s "$d/preds.json" ] || { echo "skip $L: no preds.json"; continue; }
   echo "=== grading $L ==="
   $G -m swebench.harness.run_evaluation \

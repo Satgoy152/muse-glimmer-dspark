@@ -488,7 +488,31 @@ size is quotable.
 
 ### Recording
 
-*pending — the target-only recording starts when the task 1 sweep releases the GPU.*
+**Complete.** Target-only (`SPEC_METHOD=none`, `no-spec control: target only`
+confirmed in the server log), 32 instances, 8 workers, 37 minutes.
+
+| | |
+|---|---|
+| replayable calls | **2,742** |
+| rows dropped by the converter | **0** |
+| trajectories | 32 — every task recorded |
+| output tokens | 516,208 (mean 188.3, max 3,248) |
+| calls per task | min 43, median 97.5, max 100 |
+| reasoning strengths | 644 low / 654 medium / 656 high / 788 xhigh |
+
+For scale, the frozen Terminal-Bench set is 1,753 calls and ~520K output tokens,
+so this is a comparable replay workload on a benchmark with no repository overlap
+with training.
+
+Agent exit statuses: **16 Submitted, 15 LimitsExceeded, 1 RepeatedFormatError**,
+and 16 of 32 predictions carry a non-empty patch. Half the tasks run to the
+100-step limit without submitting. That is worth stating before any resolved
+rate is quoted: **the ceiling on this sample is 16/32 even before grading**, so a
+low resolved rate here is as much a statement about a 30B model on 9-language
+repositories at a 100-step budget as it is about any drafter.
+
+The validation gate did its job: instance 0 was recorded alone first and produced
+100 replayable calls before the other 31 were launched.
 
 `scripts/swegym_holdout.sh` was a structural reference only. Its converted output
 contained one row: the `hi` health probe, which it sent **through the recording
