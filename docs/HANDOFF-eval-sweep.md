@@ -25,8 +25,9 @@ separable from noise).
   the V2 runner is selected from the checkpoint's `architectures`. Passing
   `"dflash2"` fails engine start with a pydantic literal error.
 - A DSpark drafter needs the `dspark patch OK` line in the server log, and a
-  DFlash2 checkpoint needs a `V2 Model Runner` line. `scripts/eval_replay.sh`
-  and `scripts/eval_humaneval.sh` already assert both — do not bypass them.
+  DFlash2 checkpoint needs a `V2 Model Runner` line. The DSpark check is fatal,
+  but `scripts/eval_replay.sh` currently only warns when the V2 line is absent.
+  Make that check fatal, or manually abort the run if the line is missing.
 - `SPEC_METHOD=none` in `docker/serve_patched.sh` serves the target alone. That
   is the no-spec control.
 - `ADAPTIVE=1` adds `enable_adaptive_verification` (DSpark only). It currently
@@ -49,6 +50,9 @@ tok/s  = request_generation_tokens_sum   / request_decode_time_seconds_sum     #
 ```
 
 `benchmark/analysis/norm_speed.py` computes all of these over `/mnt/data/eval/*.prom`.
+`scripts/eval_replay.sh` currently saves only the after-run snapshot. Add a
+baseline snapshot after warmup and before replay, then compute deltas; otherwise
+metrics inherited from warmup or earlier traffic contaminate the result.
 
 Client-side TTFT/TPOT are **invalid** — `--enable-auto-tool-choice` buffers
 deltas until a tool call is whole. Use the server-side histograms.
@@ -76,24 +80,42 @@ Frozen 1,753-call set at `/mnt/data/eval/raw.parquet`; harness
   effect — see `docs/RESULTS-paired.md`. `benchmark/analysis/twoway.py` shows
   the join.
 - Prefer greedy so every drafter emits identical tokens. Say so in the output:
-  the existing TB rows are temperature 1.0 and are **not** comparable to greedy ones.
+  the existing TB rows are temperature 1.0 and are **not** comparable to greedy
+  ones. The current replay harness preserves the source request's sampling
+  settings, so explicitly create greedy request manifests rather than assuming
+  `eval_replay.sh` overrides temperature. Verify completion hashes across
+  drafters before pooling results.
+- Create the four immutable bucket manifests once and reuse exactly the same
+  request IDs for every drafter and concurrency. Record the call count in every
+  manifest before launching. If sampling is needed to fit the overnight budget,
+  choose and record the fixed per-bucket sample size before looking at results.
+- Give every cell a unique name containing drafter, bucket, concurrency and
+  repeat number. The replay harness resumes existing output paths, so reusing a
+  name can silently skip calls.
 - Save `/metrics` before and after each run.
 - Per bucket and pooled: calls, output tokens, per-request accept_len,
   step-weighted accept_len, `t_step`, decode tok/s, speedup over no-spec, TTFT,
   wall-clock throughput.
 - Controls: `dflash2` twice at concurrency 1 and twice at 32.
+- Start each model server once, run all 16 bucket/concurrency cells against it,
+  and only then switch models. Do not restart the server for every cell: that
+  would turn this sweep into 128 model loads.
 
 ## Task 2 — SWE-bench Multilingual
 
-Independent of SWE-Gym, so it tests generalisation rather than the training
-distribution.
+Outside the SWE-Gym training instances, so it tests transfer to a distinct
+benchmark. Enforce repository-level disjointness as well as instance-level
+disjointness; otherwise this is not a clean independence claim.
 
-- 24-40 tasks across languages and repos, disjoint from the 2,000 instances in
-  `data/training/train_instances.jsonl`.
+- 24-40 tasks across languages and repos, disjoint from both the 2,000 instances
+  and every repository in `data/training/train_instances.jsonl`. Report Wilson
+  confidence intervals for resolved rate because this is a small sample.
 - Record target-only trajectories **once** through `scripts/proxy.py`, then
   replay the frozen calls through every drafter (`scripts/eval_replay.sh` with
-  `SRC=` your converted jsonl). `scripts/swegym_holdout.sh` is a working
-  end-to-end example of record-then-replay; copy its shape.
+  `SRC=` your converted jsonl). `scripts/swegym_holdout.sh` is only a structural
+  reference: its current output contains the `hi` warmup row and no replayable
+  evaluation calls. Fix and validate recording on one real task before launching
+  the sweep.
 - Additionally run `dflash2`, `dflash2-run-d-32k-mix-step1976` and
   `dspark-run-a-32k` **on-policy** for resolved rate.
 
@@ -107,11 +129,12 @@ Purpose: the final checkpoint's regression rests on one run that drew a single
 58,019-token completion. Report each run's `max(completion_tokens)` and the
 pooled number with and without that call, and say whether the
 midpoint-beats-final ordering survives. The paired bootstrap CI on pooled
-acceptance is +-0.11, so three runs per checkpoint is the minimum that can
-answer this.
+acceptance is +-0.11. Three total runs per checkpoint provide a basic
+run-to-run stability check; do not present them as guaranteed statistical power.
 
 ## Reporting
 
-Append to `docs/RESULTS.md` and keep its caveat discipline: quote the pooling
-you used, the concurrency, the temperature, and the control alongside every
-delta. A number without its control is not a result.
+Write all results from these sweeps to a new `docs/RESULTS-eval-sweep.md`. Do
+**not** append them to `docs/RESULTS.md`. Keep the same caveat discipline: quote
+the pooling used, concurrency, temperature, sample size and control alongside
+every delta. A number without its control is not a result.
