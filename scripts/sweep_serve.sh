@@ -28,6 +28,29 @@ PY="$REPO/.venv/bin/python"
 mkdir -p "$OUTROOT/$LABEL" /mnt/data/logs
 echo "=== serve [$LABEL] method=$METHOD spec=$SPEC port=$PORT k=$NUM_SPEC_TOKENS ==="
 
+# REUSE=1: adopt a healthy server for this exact label instead of paying the
+# ~7-minute load again. Only the container whose name encodes this label
+# qualifies -- adopting whatever happens to answer on the port is how a run gets
+# silently mislabelled, which is the failure eval_replay.sh was written against.
+REUSED=0
+if [ "${REUSE:-0}" = 1 ] \
+   && sudo docker ps --format '{{.Names}}' | grep -qx "$CTR" \
+   && curl -sf "http://127.0.0.1:$PORT/v1/models" >/dev/null 2>&1; then
+  # The name matching is not enough on its own: the same label could have been
+  # served with a different drafter path or draft budget. Check the env the
+  # container was actually started with.
+  ENV_OK=1
+  for kv in "SPEC_METHOD=$METHOD" "SPECULATOR=$SPEC" "NUM_SPEC_TOKENS=$NUM_SPEC_TOKENS"; do
+    sudo docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CTR" 2>/dev/null \
+      | grep -qx "$kv" || { echo "[$LABEL] cannot reuse: container env lacks $kv"; ENV_OK=0; }
+  done
+  if [ "$ENV_OK" = 1 ]; then
+    echo "[$LABEL] reusing the running $CTR"
+    REUSED=1
+  fi
+fi
+
+if [ "$REUSED" = 0 ]; then
 sudo docker rm -f "$CTR" >/dev/null 2>&1 || true
 if curl -sf "http://127.0.0.1:$PORT/v1/models" >/dev/null 2>&1; then
   echo "[$LABEL] ABORT: something is already serving :$PORT" >&2
@@ -41,6 +64,7 @@ sudo docker run -d --name "$CTR" --gpus '"device=0"' --network host --ipc host \
   -e SPEC_METHOD="$METHOD" -e SPECULATOR="$SPEC" \
   -e NUM_SPEC_TOKENS="$NUM_SPEC_TOKENS" -e PORT="$PORT" -e ADAPTIVE="${ADAPTIVE:-0}" \
   specd:latest bash "$REPO/docker/serve_patched.sh" >/dev/null
+fi
 
 echo "[$LABEL] waiting for health on :$PORT"
 for i in $(seq 1 240); do

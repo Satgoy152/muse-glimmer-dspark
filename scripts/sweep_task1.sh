@@ -36,7 +36,10 @@ run_label() {
         [ -s "$OUTROOT/$LABEL/${LABEL}__full__c10__t1p0__r${r}.json" ] || need=1; done;; esac
   if [ "$need" = 0 ]; then say "### $LABEL already complete, skipping"; return 0; fi
 
-  LABEL="$LABEL" SPEC="$SPEC" METHOD="$METHOD" PORT="$PORT" REPO="$REPO" \
+  # REUSE=1 adopts a still-healthy server for this exact label -- what happens
+  # when the driver is restarted but the node was not. sweep_serve.sh verifies
+  # the container's env before adopting it.
+  LABEL="$LABEL" SPEC="$SPEC" METHOD="$METHOD" PORT="$PORT" REPO="$REPO" REUSE=1 \
     OUTROOT="$OUTROOT" bash "$REPO/scripts/sweep_serve.sh" 2>&1 | tee -a "$STATE"
   if [ "${PIPESTATUS[0]}" != 0 ]; then
     say "### $LABEL SERVER FAILED -- skipping this drafter"

@@ -34,6 +34,23 @@ SEGMENTS = ["low", "medium", "high", "xhigh"]
 SIZES = {"64-128": 160, "128-256": 120, "256-1K": 60, ">=1K": 20}
 ORDER = ["64-128", "128-256", "256-1K", ">=1K"]
 
+# The recorded requests carry no max_tokens, and greedy decoding walks into
+# repetition loops that temperature 1.0 does not. Measured, uncapped: one call
+# recorded at 1,019-7,538 tokens generated 129,888 -- it ran to the 131,072
+# context limit. That single call was 82% of the >=1K bucket's output tokens and
+# 2,125 s of a 2,584 s cell, and a repetition loop drafts almost perfectly, so it
+# would also have set the bucket's step-weighted acceptance nearly on its own.
+# At concurrency 32 it is worse than expensive: the other 19 calls finish in the
+# first two minutes and the cell then measures one request decoding alone, which
+# is a concurrency-1 measurement wearing a concurrency-32 label.
+#
+# So each bucket caps generation at 4x its upper edge -- far above anything the
+# recording drew there -- and the open-ended >=1K bucket caps at 8192, just above
+# the 7,538-token maximum actually recorded in it. The cap is a property of the
+# request, identical for every drafter, and fixed before any drafter ran, so it
+# selects on nothing. The share of calls that hit it is reported.
+MAX_TOKENS = {"64-128": 512, "128-256": 1024, "256-1K": 4096, ">=1K": 8192}
+
 
 def bucket(c):
     if c < 64:
@@ -47,13 +64,14 @@ def bucket(c):
     return ">=1K"
 
 
-def greedy(body):
-    """Same request, decoded greedily."""
+def greedy(body, cap):
+    """Same request, decoded greedily, with a runaway cap."""
     b = dict(body)
     b["temperature"] = 0.0
     b.pop("top_p", None)
     b.pop("top_k", None)
     b.pop("stream", None)     # replay.py sets this itself
+    b["max_tokens"] = cap
     return b
 
 
@@ -109,6 +127,7 @@ def main():
         v.sort(key=lambda r: (r["id"], float(r["ts"])))
 
     meta = {"src": a.src, "greedy": bool(a.greedy), "sizes_requested": SIZES,
+            "max_tokens": MAX_TOKENS,
             "replayable_total": len(good), "buckets": {}}
     for b in ORDER:
         pool = by_bucket[b]
@@ -118,7 +137,7 @@ def main():
             for r in sel:
                 body = json.loads(r["request"]) if isinstance(r["request"], str) else r["request"]
                 if a.greedy:
-                    body = greedy(body)
+                    body = greedy(body, MAX_TOKENS[b])
                 fh.write(json.dumps({
                     "id": r["id"], "ts": r["ts"], "is_error": False,
                     "reasoning_strength": r["reasoning_strength"],
@@ -133,10 +152,13 @@ def main():
             "rec_out_tok_mean": round(
                 sum(r["completion_tokens"] for r in sel) / max(len(sel), 1), 1),
             "rec_out_tok_max": max((r["completion_tokens"] for r in sel), default=0),
+            "max_tokens": MAX_TOKENS[b],
         }
         print(f"{b:>8}  pool={len(pool):4d}  took={len(sel):4d}  "
               f"trajs={meta['buckets'][b]['trajs']:3d}  "
-              f"rec_out_tok={meta['buckets'][b]['rec_out_tok']:8,d}  sha={h}")
+              f"rec_out_tok={meta['buckets'][b]['rec_out_tok']:8,d}  "
+              f"rec_max={meta['buckets'][b]['rec_out_tok_max']:6,d}  "
+              f"max_tokens={MAX_TOKENS[b]:5d}  sha={h}")
 
     meta["total_calls"] = sum(v["calls"] for v in meta["buckets"].values())
     meta["total_rec_out_tok"] = sum(v["rec_out_tok"] for v in meta["buckets"].values())

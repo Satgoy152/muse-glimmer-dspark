@@ -87,13 +87,54 @@ Per-bucket sample sizes were fixed on 2026-09-08 **before any cell was run**, to
 fit ~100K output tokens per (drafter, concurrency) pass, weighted toward the
 cheap buckets so the `>=1K` bucket did not consume the whole night.
 
-| bucket | pool | sampled | trajectories | recorded out tok | sha256[:16] |
-|---|---:|---:|---:|---:|---|
-| `64-128` | 699 | **160** | 35 | 13,654 | `c405f76c71a8ae5b` |
-| `128-256` | 359 | **120** | 34 | 21,432 | `980e1e0de585e855` |
-| `256-1K` | 439 | **60** | 34 | 25,589 | `0d2164fffe7894fb` |
-| `>=1K` | 85 | **20** | 20 | 46,863 | `4d682b4cb2ae8636` |
-| total | 1,582 | **360** | 36 | 107,538 | |
+| bucket | pool | sampled | trajectories | recorded out tok | recorded max | `max_tokens` | sha256[:16] |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `64-128` | 699 | **160** | 35 | 13,654 | 125 | 512 | `93e93121a2559f97` |
+| `128-256` | 359 | **120** | 34 | 21,432 | 255 | 1024 | `ee7d9f657eeb008e` |
+| `256-1K` | 439 | **60** | 34 | 25,589 | 1,019 | 4096 | `1834f35b5a7085e7` |
+| `>=1K` | 85 | **20** | 20 | 46,863 | 7,538 | 8192 | `082f365264c9a9eb` |
+| total | 1,582 | **360** | 36 | 107,538 | | | |
+
+### The generation cap, and the run that was thrown away
+
+The recorded requests carry no `max_tokens`, and the first attempt at this sweep
+ran without one. It produced this, in the `>=1K` bucket at concurrency 1 with no
+speculation:
+
+| | |
+|---|---|
+| calls in the cell | 20 |
+| output tokens in the cell | 157,876 |
+| **output tokens in the single largest call** | **129,888** (82%) |
+| that call's recorded length | within 1,019-7,538 |
+| that call's wall time | 2,125 s of the cell's 2,584 s |
+
+Greedy decoding walked into a repetition loop and ran to the 131,072-token
+context limit. Temperature 1.0 does not do this, which is why the existing
+Terminal-Bench runs never hit it; the worst they drew was 58,019 tokens, and
+`docs/RESULTS-paired.md` already records what one call that long does to a
+token-weighted pool.
+
+Three things made this fatal rather than merely slow:
+
+1. A repetition loop is near-perfectly predictable, so it drafts extremely well.
+   That one call would have set the bucket's step-weighted acceptance almost on
+   its own, and the number would have looked plausible.
+2. At concurrency 32 the other 19 calls finish in the first couple of minutes and
+   the cell then measures one request decoding alone. That is a concurrency-1
+   measurement wearing a concurrency-32 label.
+3. `replay.py`'s 900 s timeout does not bound it — the timeout is on the socket,
+   not on the length of a stream that keeps producing bytes.
+
+So each bucket now caps generation at **4x its upper edge**, and the open-ended
+`>=1K` bucket at **8192** — just above the 7,538-token maximum the recording
+actually drew there. The cap is a property of the request, identical for every
+drafter and every concurrency, fixed before any drafter ran; it selects on
+nothing. The share of calls that reach it is reported per cell.
+
+**The four-and-a-bit uncapped cells measured before this was caught were
+discarded, not reused.** They are under `/mnt/data/eval/discarded-uncapped/`
+with their original manifests, and no number in this document comes from them.
 
 Calls with fewer than 64 recorded completion tokens (171 of the 1,753) are in no
 bucket by construction.
