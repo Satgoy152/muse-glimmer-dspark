@@ -77,14 +77,25 @@ if [ "$METHOD" = "dspark" ]; then
   esac
 fi
 # A DFlash2 checkpoint silently degrades to DFlash1 on the V1 runner, so the
-# V2 runner must actually have been selected.
+# V2 runner must actually have been selected. This used to be a warning, which
+# is the wrong severity: the degraded run still produces a full, clean,
+# plausible trace, and nothing downstream can tell it apart from a real one. It
+# also used to match on a bare "V2", which appears in unrelated log lines.
 if grep -q DFlash2DraftModel "$SPEC/config.json" 2>/dev/null; then
   case "$LOGS" in
-    *"V2"*|*"v2"*) echo "[$NAME] runner selection:";
-      printf '%s\n' "$LOGS" | grep -iE "model runner|dflash2" | head -5 ;;
-    *) echo "[$NAME] WARNING: no V2 runner line found; DFlash2 may have degraded to DFlash1" >&2 ;;
+    *"V2 Model Runner"*|*"V2 model runner"*) echo "[$NAME] V2 runner confirmed:";
+      printf '%s\n' "$LOGS" | grep -iE "v2 model runner|dflash2" | head -5 ;;
+    *) echo "[$NAME] FATAL: no 'V2 Model Runner' line; DFlash2 would degrade to DFlash1" >&2
+       printf '%s\n' "$LOGS" | grep -iE "model runner|dflash" | head -20 >&2
+       exit 1 ;;
   esac
 fi
+
+# Baseline snapshot: /metrics counters are cumulative since the server started,
+# so only an after-minus-before delta is this replay's. Saving the after
+# snapshot alone -- which is what this script used to do -- folds in the health
+# probe and anything else that reached the endpoint first.
+curl -s "http://127.0.0.1:$PORT/metrics" -o "/mnt/data/eval/$NAME.before.prom"
 
 echo "[$NAME] replaying"
 $PY "$REPO/benchmark/terminal_bench/replay.py" "$SRC" \
