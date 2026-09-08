@@ -49,7 +49,7 @@ sudo docker run -d --name "$CTR" --gpus '"device=0"' --network host --ipc host \
   -v /mnt/data:/mnt/data -e HF_HOME=/mnt/data/hf \
   -e TARGET_MODEL=meta-models/Muse-Glimmer-30B \
   -e SPEC_METHOD="$METHOD" -e SPECULATOR="$SPEC" \
-  -e NUM_SPEC_TOKENS=15 -e PORT="$PORT" \
+  -e NUM_SPEC_TOKENS=15 -e PORT="$PORT" -e ADAPTIVE="${ADAPTIVE:-0}" \
   specd:latest bash "$REPO/docker/serve_patched.sh" >/dev/null
 
 echo "[$NAME] waiting for health on :$PORT"

@@ -72,6 +72,21 @@ if [ -n "${VLLM_API_KEY}" ]; then
   AUTH_ARGS=(--api-key "${VLLM_API_KEY}")
 fi
 
+# DSpark-only: size the draft budget per request from the checkpoint's
+# confidence head instead of always drafting the full block. DFlash/DFlash2 have
+# no confidence head, so vLLM refuses this for them -- it is a lever only a
+# DSpark drafter has.
+ADAPTIVE="${ADAPTIVE:-0}"
+SPEC_CFG="{\"method\": \"${SPEC_METHOD}\", \"model\": \"${SPECULATOR}\", \"num_speculative_tokens\": ${NUM_SPEC_TOKENS}}"
+if [ "${ADAPTIVE}" = "1" ]; then
+  SPEC_CFG="{\"method\": \"${SPEC_METHOD}\", \"model\": \"${SPECULATOR}\", \"num_speculative_tokens\": ${NUM_SPEC_TOKENS}, \"enable_adaptive_verification\": true}"
+  echo "adaptive verification ON"
+fi
+SPEC_ARGS=(--per-request-spec-decode-metrics summary --speculative-config "${SPEC_CFG}")
+# SPEC_METHOD=none serves the target alone -- the autoregressive control every
+# speedup multiple is quoted against.
+if [ "${SPEC_METHOD}" = "none" ]; then SPEC_ARGS=(); echo "no-spec control: target only"; fi
+
 exec python3 -m vllm.entrypoints.openai.api_server \
   --model "${TARGET_MODEL}" \
   "${AUTH_ARGS[@]}" \
@@ -84,5 +99,4 @@ exec python3 -m vllm.entrypoints.openai.api_server \
   --max-num-seqs 128 \
   --enable-prefix-caching \
   --max-num-batched-tokens 8192 \
-  --per-request-spec-decode-metrics summary \
-  --speculative-config "{\"method\": \"${SPEC_METHOD}\", \"model\": \"${SPECULATOR}\", \"num_speculative_tokens\": ${NUM_SPEC_TOKENS}}"
+  "${SPEC_ARGS[@]}"
