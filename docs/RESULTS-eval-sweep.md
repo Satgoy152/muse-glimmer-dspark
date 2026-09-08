@@ -10,6 +10,64 @@ marked *pending* has not been measured.
 
 ---
 
+## Summary
+
+Three commissioned sweeps, plus four controls that were not commissioned and
+changed three of the conclusions.
+
+**Task 1 — bucket x concurrency.** 142 cells, 8 drafters, zero errored calls.
+Speculation's advantage over the no-spec target **halves between concurrency 1
+and 32** (`dflash2` on short turns, 4.41x -> 1.80x). Acceptance is flat across
+that range; the entire loss is step cost, which more than doubles for a
+speculative step while the bare target step grows 11%. Both DFlash2 fine-tunes
+beat `dflash2` on short turns (+0.673 [+0.361, +1.119] for the final checkpoint
+in the 64-128 bucket, against a repeat control of +0.004) and lose on long ones.
+
+**Task 2 — SWE-bench Multilingual.** 32 instances in 32 repositories, **zero
+overlap with training at both the instance and repository level**. Both DFlash2
+fine-tunes beat native `dflash2` here on both poolings with intervals clear of
+zero (+0.300 and +0.272, repeat control +0.021) — where on Terminal-Bench they
+are not separable from it. **The fine-tune transfers better to the benchmark it
+was never trained on than to the one it has been judged on.** Resolved rate
+separates nothing.
+
+**Task 3 — replay repeats.** The midpoint-beats-final ordering **does not
+survive**: +0.066 [-0.030, +0.162] step-weighted over three runs each, and the
+sign reverses per request. The 58,019-token completion the regression rested on
+was **not bad luck** — the final checkpoint drew a >16K-token call in all three
+of its runs, from the same trajectory each time, and no other checkpoint did once
+in seven runs.
+
+**The finding that was not asked for.** The fine-tune's gain tracks one property
+of the workload, monotonically, across three benchmarks:
+
+| benchmark | reasoning share of output | run-D midpoint − `dflash2` |
+|---|---:|---:|
+| SWE-Gym holdout | 49.4% | **+0.477** |
+| SWE-bench Multilingual | 62.9% | **+0.300** |
+| Terminal-Bench | 75.3% | **−0.09** (not separable) |
+
+`docs/RESULTS-paired.md` predicted this and could not test it. It now has three
+points and they are monotonic. The checkpoint is worth deploying where the model
+emits commands and worth nothing where it emits prose — and Terminal-Bench, the
+benchmark it has been evaluated on throughout, is the least favourable of the
+three.
+
+**Four things that would have been reported wrong without a control.**
+
+1. Uncapped greedy decoding let one call generate 129,888 tokens — 82% of a
+   bucket's output — and a repetition loop drafts almost perfectly, so it would
+   have set that bucket's acceptance nearly on its own.
+2. Greedy does **not** make drafters emit identical tokens at this scale. The
+   same drafter replayed twice agrees on only 96% / 83% / 80% / 70% of calls by
+   bucket, so the comparison is paired-with-noise, not exact.
+3. Task 3's premise inverted once the repeats existed.
+4. Two target-only rollouts resolve **different instances 9 times out of 32**
+   while landing within one of each other on the rate, which is why no
+   instance-level resolved-rate comparison in this document is quotable.
+
+---
+
 ## What is and is not comparable to the existing tables
 
 | | existing TB rows (`RESULTS-paired.md`) | task 1 here | task 3 here |
@@ -584,11 +642,13 @@ allows anyone to quote. The mechanism is not in dispute though — `t_step` diff
 by 2% (37.10 vs 37.87) while acceptance differs by 6%, so the gain is acceptance,
 not a cheaper drafter.
 
-**Caveat: this comparison has no same-drafter repeat on this call set yet.** The
-Terminal-Bench repeat control at concurrency 10 is +0.010 [−0.101, +0.120], which
-would put +0.300 well clear — but borrowing a noise floor from a different
-workload is exactly the shortcut this document has twice found to be wrong. A
-`dflash2` repeat over the same 2,742 calls is queued.
+**The same-drafter repeat control clears it.** `dflash2` replayed the same 2,742
+calls a second time scores **+0.021 [−0.084, +0.127]** step-weighted against its
+own first pass, +0.041 ±0.064 per request, 51% win, 11% of calls byte-identical.
+So the noise floor on this exact call set is about ±0.11, and +0.300 [+0.189,
++0.418] and +0.272 [+0.160, +0.387] are well outside it. The floor was measured
+on this workload rather than borrowed from Terminal-Bench, because borrowing one
+is the shortcut this document has twice found to be wrong.
 
 ### Why it transfers better — the reasoning-share prediction holds
 
@@ -604,16 +664,37 @@ characters, by the same method:
 | **SWE-bench Multilingual** | **62.9%** | **11.3%** |
 | Terminal-Bench | 75.3% | 2.2% |
 
-SWE-bench Multilingual sits near the training corpus and far from Terminal-Bench,
-and its no-reasoning share (11.3%) is almost exactly training's (11.6%). The
-fine-tune's step-weighted gain over `dflash2` is +0.300 here and −0.09 there.
+A third benchmark was then added to test it properly: the SWE-Gym holdout — 1,013
+recorded calls over 16 instances the fine-tune never saw, in repositories it did
+— which should sit at the training end of the axis. Measuring the reasoning share
+of all three directly against the fine-tune's measured gain:
 
-**These 32 instances were selected for repository disjointness, not for reasoning
-share** — the share was measured afterwards — and the prediction was written down
-in `RESULTS-paired.md` before this benchmark was recorded. That is stronger than
-a post-hoc fit. It is still two benchmarks and a training corpus: a consistent
-direction, not a dose-response curve. A third point (the SWE-Gym holdout, which
-should sit at the training end) is queued.
+| benchmark | reasoning share | no-reasoning turns | run-D midpoint − `dflash2`, step-weighted | 95% CI |
+|---|---:|---:|---:|---|
+| **SWE-Gym holdout** | **49.4%** | 13.4% | **+0.477** | [+0.285, +0.693] |
+| **SWE-bench Multilingual** | **62.9%** | 11.3% | **+0.300** | [+0.189, +0.418] |
+| **Terminal-Bench** | **75.3%** | 2.2% | **−0.09** | [−0.210, +0.026] |
+
+**Monotonic.** The fine-tune's advantage falls as the share of the output that is
+free-form reasoning rises, across three benchmarks spanning 49% to 75%, and it
+crosses zero before the highest. Absolute acceptance moves the same way — the
+midpoint scores 6.093 / 5.081 / 3.91 across the three, `dflash2` 5.616 / 4.796 /
+4.00 — so this is not the fine-tune improving on easy benchmarks, it is the
+fine-tune's *margin* tracking one specific property of the workload.
+
+That is a dose-response, not a direction. Three caveats keep it honest: the
+prediction came from `docs/RESULTS-paired.md` and was tested here, but the
+SWE-Gym holdout and Terminal-Bench differ in more than reasoning share; three
+points cannot separate reasoning share from anything correlated with it; and only
+the middle point has its own same-drafter repeat control (+0.021). The 32
+SWE-bench Multilingual instances were at least chosen for repository
+disjointness, with the reasoning share measured afterwards, so that point is not
+a post-hoc fit.
+
+**The practical reading is the retrain target `RESULTS-paired.md` proposed, now
+with evidence:** this fine-tune is worth deploying where the model emits
+commands, and worth nothing where it emits prose. Terminal-Bench, the benchmark
+the checkpoint has been judged on all along, is the least favourable of the three.
 
 ### Resolved rate
 
@@ -627,18 +708,40 @@ produced nothing is unresolved, not absent.
 | ours `dspark-run-a-32k` | 13 | 32 | 40.6% | [25.5%, 57.7%] | 13 |
 | ours `dflash2-run-d-mid` | 12 | 32 | 37.5% | [22.9%, 54.8%] | 13 |
 | `dflash2` | 6 | 32 | 18.8% | [8.9%, 35.3%] | 19 |
+| *control* target-only, second rollout | 14 | 32 | 43.8% | [28.2%, 60.7%] | — |
 
 **No difference here is quotable, and the table should not be read as one.**
 Every interval overlaps every other. Three of the four arms sit at 12–13 and only
 `dflash2` is low, which is the wrong shape for a drafter effect — if speculation
 were costing task resolution, all three drafters would be low, not one.
 
-The first two arms measured were target-only (13) and `dflash2` (6), paired
-exact McNemar p=0.065, and that pair on its own looks like a finding. It is the
-same trap task 3 turned on: **both arms are single stochastic rollouts at
-temperature 1.0, so two runs of the same model differ by construction and
-nothing here says by how much.** A second target-only rollout is queued purely to
-measure that floor. Until it lands, no delta in this table is interpretable.
+**The rollout-variance control, and what it actually showed.** A second
+target-only rollout was run for no other purpose than to measure how much two
+runs of an identical configuration differ:
+
+| | resolved | 95% Wilson |
+|---|---:|---|
+| target-only, rollout 1 | 13/32 | [25.5%, 57.7%] |
+| target-only, rollout 2 | **14/32** | [28.2%, 60.7%] |
+
+The two agree on the **rate** to within one instance — but they resolve
+*different instances*: 9 in common, 4 resolved only by the first and 5 only by
+the second. **Two runs of the same model disagree on 9 of 32 instances
+individually while landing within one of each other in aggregate.** So the
+resolved set is close to a coin flip per instance, and the rate is nonetheless
+fairly stable.
+
+That cuts both ways for `dflash2`'s 6. Instance-level McNemar comparisons are
+worthless here — the control pair itself is 4/5 discordant at p=1.000 — but the
+*rate* being stable across identical configurations makes 6 against 12, 13, 13,
+14 harder to wave away. Four of five rollouts land in 12–14 and one lands at 6,
+with 19 empty patches against 13–16 for the others.
+
+**One `dflash2` rollout cannot settle this**, which is precisely the position
+task 3 started from, so a second `dflash2` on-policy rollout is running. Until it
+reports, the honest statement is: no drafter is measurably worse than the target
+model on resolved rate, `dflash2`'s single low run is unexplained, and it is the
+one number in this document that a repeat could still overturn.
 
 Two further limits, independent of any of that. Between 13 and 19 of the 32
 predictions in every arm are **empty patches**, so most of the denominator is the
