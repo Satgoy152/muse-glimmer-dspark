@@ -206,6 +206,140 @@ def make_chart(out_dir, dpi, ext):
     return path
 
 
+
+# --------------------------------------------------------------------------
+# Two-metric variant: one evaluation, per-turn acceptance beside pooled tok/s.
+#
+# Terminal-Bench 64-256 output bucket, 280 calls, GREEDY, concurrency 1 --
+# the only evaluation where BOTH metrics are measured with intervals and where
+# tok/s is actually resolvable (at concurrency 10 the same drafter replayed
+# twice moves t_step 5.8%, which is larger than any effect here).
+#
+#   accept_pr  per-turn mean acceptance over the 280 calls, error bars = SEM.
+#   tps        pooled Sum gen / Sum (steps x t_step).  This is exactly the
+#              TOKEN-WEIGHTED HARMONIC MEAN of the per-call rates -- verified
+#              identical to the last digit -- which is the correct mean for a
+#              rate.  Error bars are 95% paired bootstrap CIs over calls,
+#              4,000 resamples, seed 20260830.
+#
+# THE CAVEAT THIS PANEL PAIR MUST NOT DROP: this is the 64-256 slice, which is
+# 60.35% of Terminal-Bench calls but only 24.19% of its decoded tokens.  On the
+# FULL Terminal-Bench workload the final checkpoint scores 3.923 step-weighted
+# against native DFlash2's 4.008 -- it loses there.  Quote this chart as the
+# training-length slice, not as the whole workload.
+# --------------------------------------------------------------------------
+TWO_METRIC = {
+    "dspark-community":    dict(accept_pr=4.0220, accept_pr_sem=0.0745,
+                                tps=183.929, tps_ci=(178.5230, 189.9745)),
+    "dflash-official":     dict(accept_pr=6.4360, accept_pr_sem=0.1382,
+                                tps=251.862, tps_ci=(240.2769, 266.4223)),
+    "dflash2":             dict(accept_pr=6.3063, accept_pr_sem=0.1309,
+                                tps=249.648, tps_ci=(237.8312, 264.0745)),
+    "dflash2-run-d-mid":   dict(accept_pr=7.2660, accept_pr_sem=0.1751,
+                                tps=259.707, tps_ci=(245.4982, 277.6018)),
+    "dflash2-run-d-final": dict(accept_pr=7.3500, accept_pr_sem=0.1759,
+                                tps=265.850, tps_ci=(250.5107, 285.3001)),
+}
+NOSPEC_TPS = 62.4          # no-speculation control, same bucket, concurrency 1
+HIGHLIGHT_LABELS = {
+    "final": "Ours — DFlash2 SWE-Gym\nfine-tune, step 3,956",
+    "mid":   "Ours — DFlash2 SWE-Gym\nfine-tune, step 1,976",
+}
+HIGHLIGHT_KEY = {"final": "dflash2-run-d-final", "mid": "dflash2-run-d-mid"}
+REF = "dflash2"
+
+
+def make_chart_two_metric(highlight, out_dir, dpi, ext):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    hk = HIGHLIGHT_KEY[highlight]
+    keys = ["dspark-community", "dflash-official", "dflash2", hk]
+    names = [LABELS["dspark-community"], LABELS["dflash-official"],
+             LABELS["dflash2"], HIGHLIGHT_LABELS[highlight]]
+    colors = [COLORS["dspark-community"], COLORS["dflash-official"],
+              COLORS["dflash2"], COLORS["ours"]]
+
+    panels = [
+        dict(field="accept_pr", err="sem",
+             title="Acceptance length, per turn",
+             ylab="Tokens accepted per decode step\n(mean over 280 calls)",
+             fmt="{:.2f}", note="error bars = SEM"),
+        dict(field="tps", err="ci",
+             title="Decode throughput, token-weighted harmonic mean",
+             ylab="Output tokens / s\n(pooled Σgen / Σ decode time)",
+             fmt="{:.0f}", note="error bars = 95% paired bootstrap CI"),
+    ]
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.4, 5.9))
+    for ax, pan in zip(axes, panels):
+        vals = [TWO_METRIC[k][pan["field"]] for k in keys]
+        if pan["err"] == "sem":
+            e = [TWO_METRIC[k]["accept_pr_sem"] for k in keys]
+            yerr, tops = [e, e], [v + x for v, x in zip(vals, e)]
+        else:
+            lo = [v - TWO_METRIC[k]["tps_ci"][0] for k, v in zip(keys, vals)]
+            hi = [TWO_METRIC[k]["tps_ci"][1] - v for k, v in zip(keys, vals)]
+            yerr, tops = [lo, hi], [v + x for v, x in zip(vals, hi)]
+
+        xs = list(range(len(keys)))
+        ax.bar(xs, vals, width=0.62, color=colors, yerr=yerr, capsize=5,
+               error_kw=dict(ecolor="#333333", elinewidth=1.2), zorder=3)
+
+        refv = TWO_METRIC[REF][pan["field"]]
+        headroom = max(tops) * 0.19
+        for i, (k, v) in enumerate(zip(keys, vals)):
+            ax.text(i, tops[i] + headroom * 0.09, pan["fmt"].format(v),
+                    ha="center", va="bottom", fontsize=13, fontweight="bold",
+                    color="#8A4513" if k == hk else "#222222", zorder=4)
+            if k != REF:
+                pct = 100.0 * (v - refv) / refv
+                ax.text(i, tops[i] + headroom * 0.42, f"{pct:+.1f}%",
+                        ha="center", va="bottom", fontsize=11,
+                        fontweight="bold" if k == hk else "normal",
+                        color="#1a7a3c" if pct >= 0 else "#a02020", zorder=4)
+
+        if pan["field"] == "tps":
+            ax.axhline(NOSPEC_TPS, color="#a02020", linestyle="--", linewidth=1.2,
+                       zorder=2)
+            ax.annotate(f"no speculation — {NOSPEC_TPS:.0f} tok/s",
+                        (-0.42, NOSPEC_TPS), textcoords="offset points",
+                        xytext=(0, 7), ha="left", fontsize=9, color="#a02020")
+            for i, k in enumerate(keys):
+                ax.text(i, TWO_METRIC[k]["tps"] * 0.5,
+                        f"{TWO_METRIC[k]['tps'] / NOSPEC_TPS:.2f}x",
+                        ha="center", va="center", fontsize=12 if k == hk else 10.5,
+                        fontweight="bold", color="white", zorder=5)
+
+        ax.set_ylim(0, max(tops) + headroom)
+        ax.set_xticks(xs)
+        ax.set_xticklabels(names, fontsize=9.5)
+        ax.set_ylabel(pan["ylab"], fontsize=10.5)
+        ax.set_title(f"{pan['title']}\n({pan['note']}, % vs DFlash2)",
+                     fontsize=11.5, pad=12)
+        ax.grid(axis="y", alpha=0.25, zorder=0)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+
+    fig.suptitle("Terminal-Bench 64-256 output bucket · greedy · concurrency 1 · "
+                 "NUM_SPEC_TOKENS=15", fontsize=12.5, y=0.985)
+    fig.text(0.5, 0.012,
+             "Pooled throughput equals the token-weighted harmonic mean of the "
+             "per-call rates, exactly — the correct mean for a rate. The "
+             "arithmetic mean over turns runs ~33% high.\n"
+             "This is the 64-256 slice: 60.4% of Terminal-Bench calls but 24.2% "
+             "of its decoded tokens. On the FULL workload this checkpoint scores "
+             "3.92 step-weighted against native DFlash2's 4.01.",
+             ha="center", va="bottom", fontsize=8.5, color="#555555")
+    fig.tight_layout(rect=(0, 0.10, 1, 0.965))
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f"slide_final_two_metric_{highlight}.{ext}")
+    fig.savefig(path, dpi=dpi)
+    plt.close(fig)
+    return path
+
+
 def table():
     out = ["**Step-weighted acceptance length, NUM_SPEC_TOKENS=15**\n"]
     out.append("| drafter | " + " | ".join(p["title"] for p in PANELS) + " |")
@@ -233,6 +367,13 @@ def table():
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--chart", choices=["three_panel", "two_metric", "all"],
+                   default="all",
+                   help="three_panel = three evaluations on step-weighted "
+                        "acceptance; two_metric = one evaluation, per-turn "
+                        "acceptance beside pooled tok/s")
+    p.add_argument("--highlight", choices=["mid", "final"], default="final",
+                   help="which of our checkpoints the two_metric chart features")
     p.add_argument("--out-dir", default="benchmark/plots/out")
     p.add_argument("--dpi", type=int, default=200)
     p.add_argument("--ext", default="png", choices=["png", "pdf", "svg"])
@@ -249,7 +390,10 @@ def main(argv=None):
               "  uv run --with matplotlib python benchmark/plots/slide_final.py\n"
               "or re-run with --table-only.", file=sys.stderr)
         return 1
-    print("wrote", make_chart(a.out_dir, a.dpi, a.ext))
+    if a.chart in ("three_panel", "all"):
+        print("wrote", make_chart(a.out_dir, a.dpi, a.ext))
+    if a.chart in ("two_metric", "all"):
+        print("wrote", make_chart_two_metric(a.highlight, a.out_dir, a.dpi, a.ext))
     return 0
 
 

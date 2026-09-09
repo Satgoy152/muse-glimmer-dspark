@@ -10,6 +10,8 @@ Three scripts:
   speed-up-vs-DFlash chart.
 * `slide_profile.py` — the DFlash2 Nsight profile: where GPU time goes, and why
   acceptance rather than drafter cost is the lever.
+* `slide_final.py` — the results slide: our best checkpoint against the three
+  released baselines, in two layouts.
 
 ## Commands
 
@@ -201,3 +203,51 @@ Caveats that must stay attached:
   kernel time (GPU busy is 96.9% here).
 * NVTX inside a CUDA graph's capture does not replay, so there is no subphase
   attribution *within* either full graph.
+
+
+# Final-results figures (`slide_final.py`)
+
+```bash
+# both layouts
+uv run --with matplotlib python benchmark/plots/slide_final.py
+
+# three evaluations, step-weighted acceptance, midpoint checkpoint
+uv run --with matplotlib python benchmark/plots/slide_final.py --chart three_panel
+
+# one evaluation, per-turn acceptance beside pooled tok/s, final checkpoint
+uv run --with matplotlib python benchmark/plots/slide_final.py \
+    --chart two_metric --highlight final
+```
+
+| `--chart` | layout | metric |
+|---|---|---|
+| `three_panel` | TB full · TB 64-256 · SWE-bench ML | step-weighted acceptance (the only one comparable across all three) |
+| `two_metric` | TB 64-256 only | per-turn acceptance ∥ pooled tok/s |
+
+`--highlight mid|final` picks which of our checkpoints the `two_metric` chart
+features. `three_panel` is fixed on the midpoint — see below.
+
+**Why `three_panel` headlines the midpoint (step 1,976).** The final checkpoint
+wins the concurrency-1 64-256 bucket but trails on the other two, and carries a
+reliability flag the midpoint does not: across three full Terminal-Bench replays
+each, run-D final produced a completion over 16,000 tokens in *every* run
+(58,019 / 21,577 / 18,163) while none of the other seven runs — four `dflash2`,
+three midpoint — produced one at all. That tail is what drags its full-set
+number. The ordering is not resolved either way, so the pick is a presentation
+choice, not a measured ranking.
+
+**Caveats that must travel with either layout:**
+
+* On the FULL Terminal-Bench workload our checkpoints do **not** beat native
+  `dflash2` — midpoint 3.989 ±0.072 (3 runs) against 4.008 ±0.015 (4 runs),
+  final 3.923. Showing only the 64-256 slice and SWE-bench ML is metric
+  selection. `three_panel` includes the tie deliberately; `two_metric` states it
+  in the caption.
+* `two_metric` is the 64-256 slice: 60.4% of Terminal-Bench calls, 24.2% of its
+  decoded tokens.
+* Panel-1 error bars in `three_panel` are **between-run sd**, not a bootstrap. A
+  within-run bootstrap says how tightly one run pins its own number down, not
+  where the next run lands. Only `dflash2` and our midpoint were repeated, so
+  the two single-run baselines correctly get no bar.
+* The three evaluations ran at different temperatures and concurrencies, so
+  their tok/s columns cannot share an axis — hence acceptance on `three_panel`.
