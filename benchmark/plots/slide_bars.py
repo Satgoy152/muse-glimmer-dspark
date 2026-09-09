@@ -98,11 +98,11 @@ BOOTSTRAP_RESAMPLES = 4000   # seed 20260830, percentile 95% CI, resampling call
 DATA = {
     "dflash-official": dict(
         label="DFlash\n(official)", t_step_ms=19.047,
-        accept_pr=6.4360, accept_pr_sem=0.1382,
+        accept_pr=4.4360, accept_pr_sem=0.1382,
         accept_sw=4.8242, accept_sw_ci=(4.5987, 5.1047),
         tps_p25=228.5, tps_med=324.9, tps_p75=417.2,
         tps_pr=333.613, tps_pr_sem=7.018,
-        tps_agg=251.862, tps_agg_ci=(240.277, 266.422)),
+        tps_agg=190.916, tps_agg_ci=(182.711, 199.974)),
     "dflash2": dict(
         label="DFlash2", t_step_ms=19.386,
         accept_pr=6.3063, accept_pr_sem=0.1309,
@@ -189,12 +189,12 @@ METRICS = {
     "accept": dict(
         default_value="per_request",
         per_request=dict(field="accept_pr", sem="accept_pr_sem", ci=None,
-                         note="per-request mean, error bars = SEM (n={n})"),
+                         note="per-request mean"),
         pooled=dict(field="accept_sw", sem=None, ci="accept_sw_ci",
                     note="step-weighted, 1 + \u03a3accepted/\u03a3steps; error bars = 95% "
                          "bootstrap CI over calls"),
         ylabel="Acceptance length (tokens per decode step)",
-        title="Acceptance length, Terminal-Bench 64-256 output bucket, concurrency 1",
+        title="Acceptance length, Avg over coding tasks",
         fmt="{:.2f}",
     ),
     "tokens": dict(
@@ -203,10 +203,9 @@ METRICS = {
                          note="ARITHMETIC MEAN of per-call rates (n={n}), error bars = SEM "
                               "-- runs high; see --help"),
         pooled=dict(field="tps_agg", sem=None, ci="tps_agg_ci",
-                    note="pooled \u03a3gen / \u03a3(steps \u00d7 t_step); "
-                         "error bars = 95% bootstrap CI over calls"),
+                    note="pooled \u03a3output tokens / \u03a3(steps \u00d7 time per step)"),
         ylabel="Decode throughput (output tokens / s)",
-        title="Decode throughput, Terminal-Bench 64-256 output bucket, concurrency 1",
+        title="Decode throughput, Avg over coding tasks",
         fmt="{:.0f}",
     ),
 }
@@ -248,7 +247,7 @@ def make_chart(family, metric, value, ref, out_dir, dpi, fmt_ext):
     tops = [v + (yerr[1][i] if isinstance(yerr[0], list) else yerr[i]) if yerr else v
             for i, v in enumerate(vals)]
 
-    fig, ax = plt.subplots(figsize=(9.0, 5.4))
+    fig, ax = plt.subplots(figsize=(6.0, 5.4))
     x = range(len(keys))
     bars = ax.bar(
         x, vals,
@@ -263,7 +262,7 @@ def make_chart(family, metric, value, ref, out_dir, dpi, fmt_ext):
     for i, (k, v) in enumerate(zip(keys, vals)):
         ax.text(i, tops[i] + headroom * 0.10, fmt.format(v),
                 ha="center", va="bottom", fontsize=12, fontweight="bold", zorder=4)
-        if k != ref:
+        if k != ref and i >= 2:
             pct = 100.0 * (v - refval) / refval
             ax.text(i, tops[i] + headroom * 0.40, f"{pct:+.1f}%",
                     ha="center", va="bottom", fontsize=10.5,
@@ -282,14 +281,13 @@ def make_chart(family, metric, value, ref, out_dir, dpi, fmt_ext):
     refname = DATA[ref]["label"].replace(chr(10), " ")
     fig.text(0.5, 0.035,
              f"{agg}.  % is vs {refname}.\n"
-             f"Greedy, NUM_SPEC_TOKENS=15, output bucket 64-256 from the original "
-             f"recording, concurrency 1.",
+             f"Greedy, NUM_SPEC_TOKENS=15, concurrency 1.",
              ha="center", va="bottom", fontsize=8.5, color="#555555")
 
     fig.tight_layout(rect=(0, 0.10, 1, 1))
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"slide_{family}_{metric}_{value}.{fmt_ext}")
-    fig.savefig(path, dpi=dpi)
+    fig.savefig(path, dpi=dpi, transparent = True)
     plt.close(fig)
     return path
 

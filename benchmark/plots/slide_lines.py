@@ -371,7 +371,7 @@ METRICS = {
     "accept": dict(
         default_value="per_turn",
         per_turn=dict(field="accept_pr", sem="accept_pr_sem", ci=None,
-                      note="per-turn mean acceptance, error bars = SEM (n={n})"),
+                      note="per-turn mean acceptance, "),
         pooled=dict(field="accept_sw", sem=None, ci="accept_sw_ci",
                     note="step-weighted, 1 + \u03a3accepted/\u03a3steps; "
                          "error bars = 95% paired bootstrap CI"),
@@ -379,13 +379,18 @@ METRICS = {
         title="Acceptance length vs concurrency",
         fmt="{:.2f}", ratio=False),
     "tps": dict(
-        default_value="per_turn",
+        # Harmonic, not arithmetic.  `pooled` equals the token-weighted
+        # HARMONIC mean of the per-call rates, exactly -- the correct mean for
+        # a rate.  The arithmetic per-turn mean runs ~33% high because
+        # corr(completion_tokens, per-call rate) is -0.35 to -0.42.
+        default_value="pooled",
         per_turn=dict(field="tps_pr", sem="tps_pr_sem", ci=None,
-                      note="per-turn mean of per-call rates, error bars = SEM "
-                           "(n={n}) -- runs ~33% above the pooled rate; see --help"),
+                      note="ARITHMETIC per-turn mean of per-call rates "
+                           "(runs ~33% high)\nerror bars = SEM (n={n})"),
         pooled=dict(field="tps", sem=None, ci="tps_ci",
-                    note="pooled \u03a3gen / \u03a3(steps \u00d7 t_step); "
-                         "error bars = 95% paired bootstrap CI"),
+                    note="token-weighted harmonic mean\n"
+                         "(pooled \u03a3gen / \u03a3 decode time)\n"
+                         "error bars = 95% paired bootstrap CI (n={n})"),
         ylabel="Decode throughput (output tokens / s)",
         title="Decode throughput vs concurrency",
         fmt="{:.0f}", ratio=False),
@@ -454,7 +459,7 @@ def make_chart(family, metric, value, ref, out_dir, dpi, ext, annotate):
     if metric == "vs_dflash":
         keys = [k for k in keys if k != "dflash-official"]
 
-    fig, ax = plt.subplots(figsize=(9.4, 5.6))
+    fig, ax = plt.subplots(figsize=(6.0, 5.6))
     x = list(range(len(CONCURRENCIES)))
     # Series converge at high concurrency, so labels are staggered vertically
     # rather than all sitting at +8pt on top of each other.
@@ -500,16 +505,16 @@ def make_chart(family, metric, value, ref, out_dir, dpi, ext, annotate):
     tail = ""
     if annotate == "value+pct" and not spec["ratio"]:
         tail = f"  %% is vs {LABELS[ref]}."
-    fig.text(0.5, 0.035,
-             f"{spec['note'].format(n=N_CALLS)}.{tail}\n"
-             f"Greedy, NUM_SPEC_TOKENS=15, output bucket 64-256 from the original "
-             f"recording, Terminal-Bench replay.",
+    caption = (f"{spec['note'].format(n=N_CALLS)}.{tail}\n"
+               f"Greedy, NUM_SPEC_TOKENS=15, coding tasks replay.")
+    fig.text(0.5, 0.02, caption,
              ha="center", va="bottom", fontsize=8.5, color="#555555")
 
-    fig.tight_layout(rect=(0, 0.10, 1, 1))
+    # reserve bottom space for however many lines the caption actually has
+    fig.tight_layout(rect=(0, 0.055 + 0.031 * caption.count("\n"), 1, 1))
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"slide_{family}_line_{metric}_{value}.{ext}")
-    fig.savefig(path, dpi=dpi)
+    fig.savefig(path, dpi=dpi, transparent=True)
     plt.close(fig)
     return path
 

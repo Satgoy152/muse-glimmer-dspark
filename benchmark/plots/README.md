@@ -130,8 +130,16 @@ choice, not a measured ranking. `--family all` shows every checkpoint.
 | `vs_dflash` | mean over turns of that turn's rate ÷ DFlash's rate **on the same call** ± SEM | pooled ratio ± paired bootstrap CI |
 | `vs_nospec` | — | pooled ratio, **point estimate only** |
 
-`--value auto` (default) uses `per_turn` everywhere except `vs_nospec`, which
-has no per-turn variant.
+`--value auto` (default) uses `pooled` for `tps` and `vs_nospec`, and
+`per_turn` for `accept` and `vs_dflash`.
+
+**Throughput defaults to the harmonic mean.** `pooled` equals the
+token-weighted *harmonic* mean of the per-call rates, exactly — the correct mean
+for a rate. The arithmetic per-turn mean runs ~33% high because
+`corr(completion_tokens, per-call rate)` is −0.35 to −0.42: longer turns decode
+slower, and an arithmetic mean weights a 64-token turn the same as a 256-token
+turn occupying 4x the wall-clock. `--value per_turn --metric tps` still produces
+the arithmetic version, and labels itself as such on the figure.
 
 **The two weightings disagree in sign on `vs_dflash`, and both are real.** Our
 DSpark 32K is 1.02x DFlash official per turn and 0.95x pooled at c1. Per turn it
