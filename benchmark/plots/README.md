@@ -268,26 +268,34 @@ choice, not a measured ranking.
 
 ```bash
 uv run --with matplotlib python benchmark/plots/slide_heatmap.py
+uv run --with matplotlib python benchmark/plots/slide_heatmap.py --value per_turn
 uv run python benchmark/plots/slide_heatmap.py --table-only
 ```
 
-Source: `results/terminal_bench/buckets.json`, the **full 1,753-call** frozen
-Terminal-Bench replay. Cells are step-weighted acceptance, `1 + Σaccepted/Σsteps`.
+Rebuilt from `results/node-artifacts/analysis/{an_class,an_percall}.json`, the
+per-call records of the full 1,753-call frozen Terminal-Bench replay.
 
-**Different regime from every other figure here.** This campaign is temperature
-1.0, top_k 64, **concurrency 10** — not the greedy concurrency-1 sweep. Do not
-put them in one table. There is no updated version of this breakdown: the greedy
-sweep was designed around *output-length* buckets (160/120/60/20 calls each) and
-reasoning strength was never a design variable in it, so a greedy context ×
-strength grid would need a new run.
+**Slice:** only calls whose completion length in the **original** frozen
+recording is `64 <= ctok < 256` — 1,058 of 1,808 classified calls. Context
+bucket and strength also come from the original recording, so nothing selects on
+the replayed outcome.
+
+| `--value` | what a cell is |
+|---|---|
+| `per_token` (default) | `1 + Σaccepted / Σsteps` within the cell — token-weighted, maps to throughput |
+| `per_turn` | mean of each call's own acceptance, equal weight per call; runs ~1.3–2.0 higher |
+
+Cell counts are deliberately **not** printed on the map (they crowd it) — they
+are in `--table-only`, and range 8–167.
+
+**Different regime from every other figure here.** Temperature 1.0, top_k 64,
+**concurrency 10** — not the greedy concurrency-1 sweep. Do not put them in one
+table. No greedy version exists: that sweep was built around output-length
+buckets and reasoning strength was never a design variable in it.
 
 **The control panel is not optional.** `dflash2-repeat2` is the native drafter
-replayed a second time on the same calls, so its cell deltas are the noise floor
-— and they are large. `<2K|medium` moves **+3.372** between two runs of the
-identical drafter on n=19 calls. Several fine-tune deltas are smaller than the
-control's delta in the same cell. Showing the fine-tune delta panel without the
-control invites reading structure the control says is not there.
-
-Other caveats: cell counts range 19–248; the `64K+` row exists only at xhigh;
-the diverging colour scale is clipped at ±0.70 so one outlier cell does not own
-the colourbar (its value is still printed).
+replayed a second time on the same calls, so its cell deltas are pure noise —
+and in this slice they reach **+1.04** (`32-64K|medium`, n=19) and **−0.85**
+(`32-64K|high`, n=17). Several fine-tune deltas are smaller than the control's
+delta in the same cell. The diverging scale is clipped at ±0.85 so a couple of
+tiny-n cells do not own the colourbar; their values still print.
