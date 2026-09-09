@@ -64,7 +64,9 @@ three.
 3. Task 3's premise inverted once the repeats existed.
 4. Two target-only rollouts resolve **different instances 9 times out of 32**
    while landing within one of each other on the rate, which is why no
-   instance-level resolved-rate comparison in this document is quotable.
+   instance-level resolved-rate comparison in this document is quotable — and
+   why `dflash2`'s low run needed a repeat, which returned 10/32 against 6/32
+   and left both of its rollouts below all four others.
 
 ---
 
@@ -512,9 +514,9 @@ that the two orderings disagree and neither is resolved.
 
 ## Task 2 — SWE-bench Multilingual
 
-**Selection, recording, all 8 replays and resolved rate complete.** Two controls
-— a second target-only rollout and a same-drafter replay repeat — were still
-running when this was written, and are marked where they matter.
+**Complete**, including three controls that were not commissioned: a second
+target-only rollout, a second `dflash2` rollout, and a same-drafter replay repeat
+on this call set.
 
 ### Task selection and disjointness
 
@@ -709,6 +711,7 @@ produced nothing is unresolved, not absent.
 | ours `dflash2-run-d-mid` | 12 | 32 | 37.5% | [22.9%, 54.8%] | 13 |
 | `dflash2` | 6 | 32 | 18.8% | [8.9%, 35.3%] | 19 |
 | *control* target-only, second rollout | 14 | 32 | 43.8% | [28.2%, 60.7%] | — |
+| *control* `dflash2`, second rollout | 10 | 32 | 31.2% | [18.0%, 48.6%] | — |
 
 **No difference here is quotable, and the table should not be read as one.**
 Every interval overlaps every other. Three of the four arms sit at 12–13 and only
@@ -737,11 +740,53 @@ worthless here — the control pair itself is 4/5 discordant at p=1.000 — but 
 14 harder to wave away. Four of five rollouts land in 12–14 and one lands at 6,
 with 19 empty patches against 13–16 for the others.
 
-**One `dflash2` rollout cannot settle this**, which is precisely the position
-task 3 started from, so a second `dflash2` on-policy rollout is running. Until it
-reports, the honest statement is: no drafter is measurably worse than the target
-model on resolved rate, `dflash2`'s single low run is unexplained, and it is the
-one number in this document that a repeat could still overturn.
+**The `dflash2` repeat.** A second `dflash2` on-policy rollout resolved
+**10/32**, against 6/32 the first time. Six rollouts now exist:
+
+| configuration | rollout 1 | rollout 2 | spread |
+|---|---:|---:|---:|
+| target model only | 13 | 14 | 1 |
+| `dflash2` | **6** | **10** | 4 |
+| ours `dflash2-run-d-mid` | 12 | — | — |
+| ours `dspark-run-a-32k` | 13 | — | — |
+
+**Both `dflash2` rollouts sit below every other rollout**, and its own
+run-to-run spread (4) is four times the target model's (1). Treating the six
+rollouts as exchangeable, the chance the two `dflash2` runs land in the two
+lowest positions is 1/C(6,2) = 0.067.
+
+So the repeat moved this from "one unexplained run" to "a repeated observation
+with a wide interval". It is **still not significant** — every Wilson interval
+in the table overlaps every other, n is 32, and 13–19 predictions per arm are
+empty patches. What can be said is narrower and worth saying: across two
+rollouts each, `dflash2` on-policy resolves fewer instances than the target model
+it is supposed to be reproducing, and the other two drafters do not. The right
+next experiment is more rollouts of `dflash2` and the target, not more drafters.
+
+### The thread running through three of these results
+
+Speculative decoding is meant to be output-preserving: the drafter proposes, the
+target verifies, and what comes out should be what the target alone would have
+produced. Three independent measurements in this document say it is not, in this
+stack:
+
+1. **Greedy divergence.** The same drafter replayed twice produces a different
+   completion length on 4% to 30% of calls depending on bucket, and a different
+   drafter diverges more.
+2. **A reproducible runaway.** The run-D final checkpoint drove one specific
+   trajectory past 16K tokens in **all three** of its runs; no other checkpoint
+   did so once in seven.
+3. **Resolved rate.** `dflash2` on-policy resolved 6 and 10 of 32 where the
+   target model resolved 13 and 14.
+
+Each is individually weak — (1) is partly vLLM's own run-to-run nondeterminism,
+(2) is a post-hoc pattern over ten runs, (3) has overlapping intervals. Together
+they point the same way, and the direction matters: if a drafter can change what
+the target generates, then acceptance length is not the only thing to measure
+when choosing one, and a drafter that drafts well can still cost task
+completion. **Nothing here establishes that. It is the most useful open question
+the three sweeps produced**, and the cheap version of the experiment is more
+target-vs-`dflash2` rollouts on the same 32 instances.
 
 Two further limits, independent of any of that. Between 13 and 19 of the 32
 predictions in every arm are **empty patches**, so most of the denominator is the
