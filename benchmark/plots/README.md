@@ -3,11 +3,13 @@
 Self-contained. Every number is hard-coded in the script, so nothing here reads
 `results/`, the GPU node, or any other module — edit the `DATA` dict and re-run.
 
-Two scripts:
+Three scripts:
 
 * `slide_bars.py` — one concurrency (1), acceptance and throughput per drafter.
 * `slide_lines.py` — the same drafters across concurrency 1 / 2 / 8 / 32, plus a
   speed-up-vs-DFlash chart.
+* `slide_profile.py` — the DFlash2 Nsight profile: where GPU time goes, and why
+  acceptance rather than drafter cost is the lever.
 
 ## Commands
 
@@ -149,3 +151,53 @@ resampled. Its throughput comes from the server counters and is a constant here.
 **`accept_sw` is expected to be four flat lines.** Acceptance is a property of
 the drafter and the prompt; the batch does not touch it. What moves with
 concurrency is `t_step`. That flatness is the result, not a broken plot.
+
+
+# Profiling figures (`slide_profile.py`)
+
+```bash
+# all three
+uv run --with matplotlib python benchmark/plots/slide_profile.py
+
+# just the stacked time split
+uv run --with matplotlib python benchmark/plots/slide_profile.py --chart phases
+
+# tables only, no matplotlib
+uv run python benchmark/plots/slide_profile.py --table-only
+```
+
+Source: `docs/RESULTS-profiling-dflash2.md` and
+`benchmark/profiling/results/analysis/*.json`. Nsight Systems, 50-step
+steady-state decode window, four cases (short/long prompts x concurrency 1/10).
+
+| `--chart` | what it shows | status |
+|---|---|---|
+| `phases` | GPU kernel time by phase; the whole drafter is 12.4-13.1% | **measured** |
+| `prompts` | three prompts: step time flat within 3%, throughput spans 6.1x | **measured** |
+| `headroom` | scenario arithmetic on `tok/s = accept_len / t_step` | **derived** |
+
+The argument the three make together:
+
+1. Target verification is 82.9-83.7% of GPU time and the entire drafter is ~13%,
+   so **cost-side work on the drafter has at most ~15% to recover** even if you
+   deleted it completely.
+2. On the same server, at the same step cost (19.3-19.8 ms, a 3% spread),
+   throughput ranges 106-645 tok/s across three prompts. **All of that spread is
+   accepted length.**
+3. Our DFlash2 fine-tune's measured acceptance gain is worth +16.6% throughput —
+   more than deleting the entire drafter, and it cost no extra step time
+   (`t_step` 19.397 ms vs native DFlash2's 19.386).
+
+Caveats that must stay attached:
+
+* This is a **speed profile, not a quality evaluation**. Nothing in it measures
+  whether the drafter proposes good tokens.
+* `ignore_eos=true` inflates accepted length — forcing generation past the
+  natural stop drives repetition, which drafts almost perfectly. That is the
+  12.97. Those accepted lengths are an **upper bound**, not a quality result.
+  The flat-step-time point does not depend on the inflation.
+* The `headroom` chart is **arithmetic, not measurement**. Its two grey bars are
+  unreachable bounds, not proposals, and it assumes step time scales with GPU
+  kernel time (GPU busy is 96.9% here).
+* NVTX inside a CUDA graph's capture does not replay, so there is no subphase
+  attribution *within* either full graph.
