@@ -19,20 +19,31 @@ docs/RESULTS-eval-sweep.md.
     completion_tokens, not from each drafter's own replayed output, so nothing
     selects on the outcome
 
-Three different aggregations are carried, because they answer different
-questions and disagree:
+Two aggregations are carried, because they answer different questions and
+disagree by a large margin:
 
-  per_request    mean over the 280 calls, every call weighted equally.
-                 This is the "accept len by request" the slide asks for.
-                 It has a per-call distribution, so it gets SEM error bars.
-  step_weighted  1 + sum(accepted) / sum(steps). Long calls dominate. This is
-                 the acceptance that actually drives aggregate throughput.
-  aggregate      sum(gen_tokens) / sum(steps * t_step). Deployment throughput
-                 over the whole bucket.
+  per_request  mean over the 280 calls, every call weighted equally. This is
+               the "accept len by request" the slide asks for. It has a
+               per-call distribution, so its error bars are the SEM.
+  pooled       for acceptance: 1 + sum(accepted) / sum(steps) (step-weighted).
+               for throughput: sum(gen) / sum(steps * t_step).
+               One ratio over the whole bucket, so long calls dominate. Its
+               error bars are a 95% percentile bootstrap CI resampling calls
+               (4,000 resamples, seed 20260830), computed on the node from
+               percall.json and hard-coded here.
 
-step_weighted and aggregate are single pooled ratios, NOT means over calls, so
-they have no standard error to draw. The script refuses to put error bars on
-them rather than inventing a spread.
+READ THIS BEFORE PLOTTING THROUGHPUT
+------------------------------------
+`--metric tokens --value per_request` computes a MEAN OF PER-CALL RATES. It is
+not a throughput anyone measures, and it runs ~33% high: per-call rate is just
+that call's acceptance divided by t_step, so it inherits the same short-call
+bias that makes per-request acceptance (6.44) exceed step-weighted acceptance
+(4.82). 6.44 / 19.047 ms = 338 tok/s against a real pooled 252 tok/s.
+
+The default for --metric tokens is therefore `pooled`, which is the column in
+the deck's Table B. The per-request variant is kept only so the two charts can
+be drawn on a matched definition if you want that, and it is labelled as such
+on the figure.
 
 CAVEAT TO KEEP WITH ANY SLIDE BUILT FROM THIS
 ---------------------------------------------
@@ -60,16 +71,51 @@ import sys
 # 280 calls; they exist only for the per-request aggregation.
 # --------------------------------------------------------------------------
 N_CALLS = 280
+BOOTSTRAP_RESAMPLES = 4000   # seed 20260830, percentile 95% CI, resampling calls
 
 DATA = {
-    # key                     label                      accept_pr  sem   accept_sw  tps_pr  sem   tps_agg  t_step_ms
-    "dflash-official":  dict(label="DFlash\n(official)",  accept_pr=6.4360, accept_pr_sem=0.1382, accept_sw=4.8242, tps_pr=333.613, tps_pr_sem=7.018, tps_agg=251.862, t_step_ms=19.047),
-    "dflash2":          dict(label="DFlash2",             accept_pr=6.3063, accept_pr_sem=0.1309, accept_sw=4.8390, tps_pr=325.485, tps_pr_sem=6.762, tps_agg=249.648, t_step_ms=19.386),
-    "dspark-community": dict(label="DSpark\n(community)", accept_pr=4.0220, accept_pr_sem=0.0745, accept_sw=3.6199, tps_pr=204.475, tps_pr_sem=3.751, tps_agg=183.929, t_step_ms=19.700),
-    "dspark-run-a-32k": dict(label="Ours\nDSpark 32K",    accept_pr=6.9381, accept_pr_sem=0.1699, accept_sw=4.8065, tps_pr=341.708, tps_pr_sem=8.273, tps_agg=239.731, t_step_ms=19.724),
-    "dspark-run-b-49k": dict(label="Ours\nDSpark 49K",    accept_pr=6.9190, accept_pr_sem=0.1699, accept_sw=4.7796, tps_pr=341.074, tps_pr_sem=8.251, tps_agg=238.600, t_step_ms=19.724),
-    "dflash2-run-d-mid":   dict(label="Ours\nDFlash2 mid",   accept_pr=7.2660, accept_pr_sem=0.1751, accept_sw=5.0664, tps_pr=370.425, tps_pr_sem=8.892, tps_agg=259.707, t_step_ms=19.370),
-    "dflash2-run-d-final": dict(label="Ours\nDFlash2 final", accept_pr=7.3500, accept_pr_sem=0.1759, accept_sw=5.1896, tps_pr=374.567, tps_pr_sem=8.910, tps_agg=265.850, t_step_ms=19.397),
+    "dflash-official": dict(
+        label="DFlash\n(official)", t_step_ms=19.047,
+        accept_pr=6.4360, accept_pr_sem=0.1382,
+        accept_sw=4.8242, accept_sw_ci=(4.5987, 5.1047),
+        tps_pr=333.613, tps_pr_sem=7.018,
+        tps_agg=251.862, tps_agg_ci=(240.277, 266.422)),
+    "dflash2": dict(
+        label="DFlash2", t_step_ms=19.386,
+        accept_pr=6.3063, accept_pr_sem=0.1309,
+        accept_sw=4.8390, accept_sw_ci=(4.6112, 5.1186),
+        tps_pr=325.485, tps_pr_sem=6.762,
+        tps_agg=249.648, tps_agg_ci=(237.831, 264.074)),
+    "dspark-community": dict(
+        label="DSpark\n(community)", t_step_ms=19.700,
+        accept_pr=4.0220, accept_pr_sem=0.0745,
+        accept_sw=3.6199, accept_sw_ci=(3.5129, 3.7392),
+        tps_pr=204.475, tps_pr_sem=3.751,
+        tps_agg=183.929, tps_agg_ci=(178.523, 189.974)),
+    "dspark-run-a-32k": dict(
+        label="Ours\nDSpark 32K", t_step_ms=19.724,
+        accept_pr=6.9381, accept_pr_sem=0.1699,
+        accept_sw=4.8065, accept_sw_ci=(4.5481, 5.1266),
+        tps_pr=341.708, tps_pr_sem=8.273,
+        tps_agg=239.731, tps_agg_ci=(227.287, 255.264)),
+    "dspark-run-b-49k": dict(
+        label="Ours\nDSpark 49K", t_step_ms=19.724,
+        accept_pr=6.9190, accept_pr_sem=0.1699,
+        accept_sw=4.7796, accept_sw_ci=(4.5149, 5.1027),
+        tps_pr=341.074, tps_pr_sem=8.251,
+        tps_agg=238.600, tps_agg_ci=(225.815, 254.195)),
+    "dflash2-run-d-mid": dict(
+        label="Ours\nDFlash2 mid", t_step_ms=19.370,
+        accept_pr=7.2660, accept_pr_sem=0.1751,
+        accept_sw=5.0664, accept_sw_ci=(4.7855, 5.4201),
+        tps_pr=370.425, tps_pr_sem=8.892,
+        tps_agg=259.707, tps_agg_ci=(245.498, 277.602)),
+    "dflash2-run-d-final": dict(
+        label="Ours\nDFlash2 final", t_step_ms=19.397,
+        accept_pr=7.3500, accept_pr_sem=0.1759,
+        accept_sw=5.1896, accept_sw_ci=(4.8894, 5.5729),
+        tps_pr=374.567, tps_pr_sem=8.910,
+        tps_agg=265.850, tps_agg_ci=(250.511, 285.300)),
 }
 
 # No-speculation control, same bucket / same concurrency, for the "x over
@@ -105,17 +151,24 @@ COLORS = {
 
 METRICS = {
     "accept": dict(
-        per_request=("accept_pr", "accept_pr_sem"),
-        step_weighted=("accept_sw", None),
-        aggregate=("accept_sw", None),
+        default_value="per_request",
+        per_request=dict(field="accept_pr", sem="accept_pr_sem", ci=None,
+                         note="per-request mean, error bars = SEM (n={n})"),
+        pooled=dict(field="accept_sw", sem=None, ci="accept_sw_ci",
+                    note="step-weighted, 1 + \u03a3accepted/\u03a3steps; error bars = 95% "
+                         "bootstrap CI over calls"),
         ylabel="Acceptance length (tokens per decode step)",
         title="Acceptance length, Terminal-Bench 64-256 output bucket, concurrency 1",
         fmt="{:.2f}",
     ),
     "tokens": dict(
-        per_request=("tps_pr", "tps_pr_sem"),
-        step_weighted=("tps_agg", None),
-        aggregate=("tps_agg", None),
+        default_value="pooled",
+        per_request=dict(field="tps_pr", sem="tps_pr_sem", ci=None,
+                         note="MEAN OF PER-CALL RATES (n={n}), error bars = SEM -- not a "
+                              "throughput anyone measures; see --help"),
+        pooled=dict(field="tps_agg", sem=None, ci="tps_agg_ci",
+                    note="pooled \u03a3gen / \u03a3(steps \u00d7 t_step); "
+                         "error bars = 95% bootstrap CI over calls"),
         ylabel="Decode throughput (output tokens / s)",
         title="Decode throughput, Terminal-Bench 64-256 output bucket, concurrency 1",
         fmt="{:.0f}",
@@ -123,12 +176,26 @@ METRICS = {
 }
 
 
+def resolve_value(metric, value):
+    return METRICS[metric]["default_value"] if value == "auto" else value
+
+
 def series(family, metric, value):
+    """Return (keys, values, yerr) where yerr is None, a 1-D SEM list, or a
+    2xN [[lo],[hi]] array of asymmetric bootstrap-CI half-widths."""
     keys = FAMILIES[family]
-    field, semfield = METRICS[metric][value]
-    vals = [DATA[k][field] for k in keys]
-    sems = [DATA[k][semfield] for k in keys] if semfield else None
-    return keys, vals, sems
+    spec = METRICS[metric][resolve_value(metric, value)]
+    vals = [DATA[k][spec["field"]] for k in keys]
+    if spec["sem"]:
+        return keys, vals, [DATA[k][spec["sem"]] for k in keys]
+    if spec["ci"]:
+        lo, hi = [], []
+        for k, v in zip(keys, vals):
+            a, b = DATA[k][spec["ci"]]
+            lo.append(v - a)
+            hi.append(b - v)
+        return keys, vals, [lo, hi]
+    return keys, vals, None
 
 
 def make_chart(family, metric, value, ref, out_dir, dpi, fmt_ext):
@@ -136,10 +203,14 @@ def make_chart(family, metric, value, ref, out_dir, dpi, fmt_ext):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    keys, vals, sems = series(family, metric, value)
-    field = METRICS[metric][value][0]
-    refval = DATA[ref][field]
+    value = resolve_value(metric, value)
+    keys, vals, yerr = series(family, metric, value)
+    spec = METRICS[metric][value]
+    refval = DATA[ref][spec["field"]]
     fmt = METRICS[metric]["fmt"]
+    # top of each error bar, for label placement
+    tops = [v + (yerr[1][i] if isinstance(yerr[0], list) else yerr[i]) if yerr else v
+            for i, v in enumerate(vals)]
 
     fig, ax = plt.subplots(figsize=(9.0, 5.4))
     x = range(len(keys))
@@ -147,42 +218,42 @@ def make_chart(family, metric, value, ref, out_dir, dpi, fmt_ext):
         x, vals,
         color=[COLORS[k] for k in keys],
         width=0.62,
-        yerr=sems, capsize=5 if sems else 0,
+        yerr=yerr, capsize=5 if yerr else 0,
         error_kw=dict(ecolor="#333333", elinewidth=1.2),
         zorder=3,
     )
 
-    headroom = max(vals) * (0.19 if sems else 0.15)
+    headroom = max(vals) * 0.19
     for i, (k, v) in enumerate(zip(keys, vals)):
-        e = sems[i] if sems else 0.0
-        ax.text(i, v + e + headroom * 0.10, fmt.format(v),
+        ax.text(i, tops[i] + headroom * 0.10, fmt.format(v),
                 ha="center", va="bottom", fontsize=12, fontweight="bold", zorder=4)
         if k != ref:
             pct = 100.0 * (v - refval) / refval
-            ax.text(i, v + e + headroom * 0.40, f"{pct:+.1f}%",
+            ax.text(i, tops[i] + headroom * 0.40, f"{pct:+.1f}%",
                     ha="center", va="bottom", fontsize=10.5,
                     color="#1a7a3c" if pct >= 0 else "#a02020", zorder=4)
 
     ax.set_xticks(list(x))
     ax.set_xticklabels([DATA[k]["label"] for k in keys], fontsize=10.5)
     ax.set_ylabel(METRICS[metric]["ylabel"], fontsize=11)
-    ax.set_ylim(0, max(v + (sems[i] if sems else 0) for i, v in enumerate(vals)) + headroom)
+    ax.set_ylim(0, max(tops) + headroom)
     ax.set_title(METRICS[metric]["title"], fontsize=12.5, pad=14)
     ax.grid(axis="y", alpha=0.25, zorder=0)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
 
-    agg = {"per_request": "per-request mean, error bars = SEM (n=%d)" % N_CALLS,
-           "step_weighted": "step-weighted pooled ratio - no per-call spread, so no error bars",
-           "aggregate": "pooled over the bucket - no per-call spread, so no error bars"}[value]
-    ax.text(0.0, -0.20, f"{agg}. % is vs {DATA[ref]['label'].replace(chr(10), ' ')}. "
-                        f"Greedy, NUM_SPEC_TOKENS=15, bucketed on the original recording.",
-            transform=ax.transAxes, fontsize=8.5, color="#555555")
+    agg = spec["note"].format(n=N_CALLS)
+    refname = DATA[ref]["label"].replace(chr(10), " ")
+    fig.text(0.5, 0.035,
+             f"{agg}.  % is vs {refname}.\n"
+             f"Greedy, NUM_SPEC_TOKENS=15, output bucket 64-256 from the original "
+             f"recording, concurrency 1.",
+             ha="center", va="bottom", fontsize=8.5, color="#555555")
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0.10, 1, 1))
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"slide_{family}_{metric}_{value}.{fmt_ext}")
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    fig.savefig(path, dpi=dpi)
     plt.close(fig)
     return path
 
@@ -221,9 +292,9 @@ def main(argv=None):
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--family", choices=sorted(FAMILIES), default="dspark")
     p.add_argument("--metric", choices=["accept", "tokens", "both"], default="both")
-    p.add_argument("--value", choices=["per_request", "step_weighted", "aggregate"],
-                   default="per_request",
-                   help="which aggregation to plot; only per_request has error bars")
+    p.add_argument("--value", choices=["auto", "per_request", "pooled"], default="auto",
+                   help="auto (default) = per_request for --metric accept, pooled for "
+                        "--metric tokens. See the module docstring for why.")
     p.add_argument("--ref", default=None, help="drafter key used for the %% labels")
     p.add_argument("--out-dir", default="benchmark/plots/out")
     p.add_argument("--dpi", type=int, default=200)

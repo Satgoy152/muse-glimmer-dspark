@@ -15,9 +15,9 @@ uv run --with matplotlib python benchmark/plots/slide_bars.py --family dflash2
 # All seven drafters on one chart
 uv run --with matplotlib python benchmark/plots/slide_bars.py --family all
 
-# The step-weighted view (the one that maps to deployment throughput)
+# The step-weighted acceptance view (the one that maps to deployment throughput)
 uv run --with matplotlib python benchmark/plots/slide_bars.py \
-    --family dspark --value step_weighted
+    --family dspark --metric accept --value pooled
 
 # Table only, no matplotlib needed
 uv run python benchmark/plots/slide_bars.py --family dspark --table-only
@@ -37,13 +37,23 @@ are measured on timed serial replays, not the normalised
 Bucket membership comes from the **original frozen recording's**
 `completion_tokens`, so nothing selects on the replayed outcome.
 
-Three aggregations are carried because they disagree:
+Two aggregations are carried because they disagree:
 
-| | what it is | error bars? |
-|---|---|---|
-| `per_request` | mean over the 280 calls, equal weight each | yes, SEM |
-| `step_weighted` | `1 + Σaccepted / Σsteps` | no — pooled ratio |
-| `aggregate` | `Σgen / Σ(steps × t_step)` | no — pooled ratio |
+| `--value` | acceptance | throughput | error bars |
+|---|---|---|---|
+| `per_request` | mean over the 280 calls | mean of per-call rates | SEM |
+| `pooled` | `1 + Σaccepted / Σsteps` | `Σgen / Σ(steps × t_step)` | 95% bootstrap CI over calls (4,000 resamples, seed 20260830) |
+
+`--value auto` (the default) picks `per_request` for `--metric accept` and
+`pooled` for `--metric tokens`.
+
+**Do not plot throughput as `per_request`.** A mean of per-call rates is each
+call's acceptance divided by `t_step`, so it inherits the same short-call bias
+that makes per-request acceptance (6.44) exceed step-weighted acceptance (4.82):
+6.44 / 19.047 ms = 338 tok/s against a real pooled 252 tok/s, ~33% high. The
+`pooled` column is the one in the deck's Table B. The per-request variant is
+kept only so both charts can be drawn on a matched definition, and the figure
+labels itself when you do.
 
 **Caveat that must stay attached:** the `64-256` bucket is 60.35% of
 Terminal-Bench calls but only 24.19% of its decoded tokens. Per-request bars
