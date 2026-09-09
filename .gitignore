@@ -6,3 +6,4 @@ data/raw/
 data/traces/
 archive/
 benchmark/plots/out/
+results/node-artifacts/
