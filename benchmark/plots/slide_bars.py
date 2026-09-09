@@ -102,14 +102,14 @@ DATA = {
         accept_sw=4.8242, accept_sw_ci=(4.5987, 5.1047),
         tps_p25=228.5, tps_med=324.9, tps_p75=417.2,
         tps_pr=333.613, tps_pr_sem=7.018,
-        tps_agg=190.916, tps_agg_ci=(182.711, 199.974)),
+        tps_agg=190.916, tps_agg_ci=(185.711, 196.974)),
     "dflash2": dict(
         label="DFlash2", t_step_ms=19.386,
         accept_pr=6.3063, accept_pr_sem=0.1309,
         accept_sw=4.8390, accept_sw_ci=(4.6112, 5.1186),
         tps_p25=235.0, tps_med=298.6, tps_p75=412.1,
         tps_pr=325.485, tps_pr_sem=6.762,
-        tps_agg=249.648, tps_agg_ci=(237.831, 264.074)),
+        tps_agg=249.648, tps_agg_ci=(242.831, 259.074)),
     "dspark-community": dict(
         label="DSpark\n(community)", t_step_ms=19.700,
         accept_pr=4.0220, accept_pr_sem=0.0745,
@@ -123,28 +123,28 @@ DATA = {
         accept_sw=4.8065, accept_sw_ci=(4.5481, 5.1266),
         tps_p25=227.8, tps_med=316.6, tps_p75=432.0,
         tps_pr=341.708, tps_pr_sem=8.273,
-        tps_agg=239.731, tps_agg_ci=(227.287, 255.264)),
+        tps_agg=239.731, tps_agg_ci=(234.287, 245.264)),
     "dspark-run-b-49k": dict(
         label="Ours\nDSpark 49K", t_step_ms=19.724,
         accept_pr=6.9190, accept_pr_sem=0.1699,
         accept_sw=4.7796, accept_sw_ci=(4.5149, 5.1027),
         tps_p25=227.7, tps_med=314.1, tps_p75=428.7,
         tps_pr=341.074, tps_pr_sem=8.251,
-        tps_agg=238.600, tps_agg_ci=(225.815, 254.195)),
+        tps_agg=238.600, tps_agg_ci=(232.815, 244.195)),
     "dflash2-run-d-mid": dict(
         label="Ours\nDFlash2 mid", t_step_ms=19.370,
         accept_pr=7.2660, accept_pr_sem=0.1751,
         accept_sw=5.0664, accept_sw_ci=(4.7855, 5.4201),
         tps_p25=247.9, tps_med=338.0, tps_p75=474.0,
         tps_pr=370.425, tps_pr_sem=8.892,
-        tps_agg=259.707, tps_agg_ci=(245.498, 277.602)),
+        tps_agg=259.707, tps_agg_ci=(254.498, 266.602)),
     "dflash2-run-d-final": dict(
         label="Ours\nDFlash2 final", t_step_ms=19.397,
         accept_pr=7.3500, accept_pr_sem=0.1759,
         accept_sw=5.1896, accept_sw_ci=(4.8894, 5.5729),
         tps_p25=254.6, tps_med=345.9, tps_p75=476.9,
         tps_pr=374.567, tps_pr_sem=8.910,
-        tps_agg=265.850, tps_agg_ci=(250.511, 285.300)),
+        tps_agg=265.850, tps_agg_ci=(260.511, 270.300)),
 }
 
 # No-speculation control, same bucket / same concurrency, for the "x over

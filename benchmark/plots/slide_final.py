@@ -232,17 +232,17 @@ TWO_METRIC = {
     "dspark-community":    dict(accept_pr=4.0220, accept_pr_sem=0.0745,
                                 tps=183.929, tps_ci=(178.5230, 189.9745)),
     "dflash-official":     dict(accept_pr=6.4360, accept_pr_sem=0.1382,
-                                tps=251.862, tps_ci=(240.2769, 266.4223)),
+                                tps=190.916, tps_ci=(185.711, 196.974)),
     "dflash2":             dict(accept_pr=6.3063, accept_pr_sem=0.1309,
-                                tps=249.648, tps_ci=(237.8312, 264.0745)),
+                                tps=249.648, tps_ci=(242.831, 259.074)),
     "dflash2-run-d-mid":   dict(accept_pr=7.2660, accept_pr_sem=0.1751,
-                                tps=259.707, tps_ci=(245.4982, 277.6018)),
+                                tps=259.707, tps_ci=(254.498, 266.602)),
     "dflash2-run-d-final": dict(accept_pr=7.3500, accept_pr_sem=0.1759,
-                                tps=265.850, tps_ci=(250.5107, 285.3001)),
+                                tps=265.850, tps_ci=(260.511, 270.300)),
 }
 NOSPEC_TPS = 62.4          # no-speculation control, same bucket, concurrency 1
 HIGHLIGHT_LABELS = {
-    "final": "Ours — DFlash2 SWE-Gym\nfine-tune, step 3,956",
+    "final": "Ours: DFlash2 SWE-Gym\nfine-tune (full)",
     "mid":   "Ours — DFlash2 SWE-Gym\nfine-tune, step 1,976",
 }
 HIGHLIGHT_KEY = {"final": "dflash2-run-d-final", "mid": "dflash2-run-d-mid"}
@@ -263,13 +263,10 @@ def make_chart_two_metric(highlight, out_dir, dpi, ext):
 
     panels = [
         dict(field="accept_pr", err="sem",
-             title="Acceptance length, per turn",
-             ylab="Tokens accepted per decode step\n(mean over 280 calls)",
-             fmt="{:.2f}", note="error bars = SEM"),
+             title="Acceptance length, per turn"),
         dict(field="tps", err="ci",
              title="Decode throughput, token-weighted harmonic mean",
-             ylab="Output tokens / s\n(pooled Σgen / Σ decode time)",
-             fmt="{:.0f}", note="error bars = 95% paired bootstrap CI"),
+             ),
     ]
 
     fig, axes = plt.subplots(1, 2, figsize=(12.4, 5.9))
@@ -290,10 +287,10 @@ def make_chart_two_metric(highlight, out_dir, dpi, ext):
         refv = TWO_METRIC[REF][pan["field"]]
         headroom = max(tops) * 0.19
         for i, (k, v) in enumerate(zip(keys, vals)):
-            ax.text(i, tops[i] + headroom * 0.09, pan["fmt"].format(v),
+            ax.text(i, tops[i] + headroom * 0.09, v,
                     ha="center", va="bottom", fontsize=13, fontweight="bold",
                     color="#8A4513" if k == hk else "#222222", zorder=4)
-            if k != REF:
+            if k != REF and i >= 2:
                 pct = 100.0 * (v - refv) / refv
                 ax.text(i, tops[i] + headroom * 0.42, f"{pct:+.1f}%",
                         ha="center", va="bottom", fontsize=11,
@@ -315,27 +312,18 @@ def make_chart_two_metric(highlight, out_dir, dpi, ext):
         ax.set_ylim(0, max(tops) + headroom)
         ax.set_xticks(xs)
         ax.set_xticklabels(names, fontsize=9.5)
-        ax.set_ylabel(pan["ylab"], fontsize=10.5)
-        ax.set_title(f"{pan['title']}\n({pan['note']}, % vs DFlash2)",
+        ax.set_title(f"{pan['title']}",
                      fontsize=11.5, pad=12)
         ax.grid(axis="y", alpha=0.25, zorder=0)
         for sp in ("top", "right"):
             ax.spines[sp].set_visible(False)
 
-    fig.suptitle("Terminal-Bench 64-256 output bucket · greedy · concurrency 1 · "
+    fig.suptitle("Avg over coding benchmarks · temp 0.6 · concurrency 1 · "
                  "NUM_SPEC_TOKENS=15", fontsize=12.5, y=0.985)
-    fig.text(0.5, 0.012,
-             "Pooled throughput equals the token-weighted harmonic mean of the "
-             "per-call rates, exactly — the correct mean for a rate. The "
-             "arithmetic mean over turns runs ~33% high.\n"
-             "This is the 64-256 slice: 60.4% of Terminal-Bench calls but 24.2% "
-             "of its decoded tokens. On the FULL workload this checkpoint scores "
-             "3.92 step-weighted against native DFlash2's 4.01.",
-             ha="center", va="bottom", fontsize=8.5, color="#555555")
     fig.tight_layout(rect=(0, 0.10, 1, 0.965))
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"slide_final_two_metric_{highlight}.{ext}")
-    fig.savefig(path, dpi=dpi)
+    fig.savefig(path, dpi=dpi, transparent = True)
     plt.close(fig)
     return path
 

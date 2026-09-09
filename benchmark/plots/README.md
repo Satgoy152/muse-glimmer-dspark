@@ -10,6 +10,9 @@ Three scripts:
   speed-up-vs-DFlash chart.
 * `slide_profile.py` — the DFlash2 Nsight profile: where GPU time goes, and why
   acceptance rather than drafter cost is the lever.
+* `slide_heatmap.py` — acceptance by context length x reasoning strength, our
+  final DFlash2 checkpoint vs the native baseline, with the same-drafter repeat
+  control as the noise floor.
 * `slide_final.py` — the results slide: our best checkpoint against the three
   released baselines, in two layouts.
 
@@ -259,3 +262,32 @@ choice, not a measured ranking.
   the two single-run baselines correctly get no bar.
 * The three evaluations ran at different temperatures and concurrencies, so
   their tok/s columns cannot share an axis — hence acceptance on `three_panel`.
+
+
+# Context x reasoning-strength heatmaps (`slide_heatmap.py`)
+
+```bash
+uv run --with matplotlib python benchmark/plots/slide_heatmap.py
+uv run python benchmark/plots/slide_heatmap.py --table-only
+```
+
+Source: `results/terminal_bench/buckets.json`, the **full 1,753-call** frozen
+Terminal-Bench replay. Cells are step-weighted acceptance, `1 + Σaccepted/Σsteps`.
+
+**Different regime from every other figure here.** This campaign is temperature
+1.0, top_k 64, **concurrency 10** — not the greedy concurrency-1 sweep. Do not
+put them in one table. There is no updated version of this breakdown: the greedy
+sweep was designed around *output-length* buckets (160/120/60/20 calls each) and
+reasoning strength was never a design variable in it, so a greedy context ×
+strength grid would need a new run.
+
+**The control panel is not optional.** `dflash2-repeat2` is the native drafter
+replayed a second time on the same calls, so its cell deltas are the noise floor
+— and they are large. `<2K|medium` moves **+3.372** between two runs of the
+identical drafter on n=19 calls. Several fine-tune deltas are smaller than the
+control's delta in the same cell. Showing the fine-tune delta panel without the
+control invites reading structure the control says is not there.
+
+Other caveats: cell counts range 19–248; the `64K+` row exists only at xhigh;
+the diverging colour scale is clipped at ±0.70 so one outlier cell does not own
+the colourbar (its value is still printed).
