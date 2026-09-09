@@ -161,10 +161,17 @@ FAMILIES = {
     "all": ["dflash-official", "dflash2",
             "dflash2-run-d-mid", "dflash2-run-d-final",
             "dspark-community", "dspark-run-a-32k", "dspark-run-b-49k"],
+    # Three released baselines plus the best checkpoint from each of our two
+    # families.  "Best" is by point estimate only -- DSpark 32K vs 49K and
+    # DFlash2 final vs mid are inside each other's bootstrap intervals, so the
+    # pick is a presentation choice, not a measured ranking.
+    "best": ["dflash-official", "dflash2", "dspark-community",
+             "dspark-run-a-32k", "dflash2-run-d-final"],
 }
 
 # Default reference for the "% improvement" annotation on each bar.
-DEFAULT_REF = {"dspark": "dspark-community", "dflash2": "dflash2", "all": "dflash2"}
+DEFAULT_REF = {"dspark": "dspark-community", "dflash2": "dflash2",
+               "all": "dflash2", "best": "dflash-official"}
 
 # Colour: each family gets a hue; the warm start is the pale shade, our
 # fine-tunes are progressively saturated versions of the SAME hue.

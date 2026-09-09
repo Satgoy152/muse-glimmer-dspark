@@ -108,14 +108,33 @@ uv run python benchmark/plots/slide_lines.py --family all --table-only
 point and `none` labels nothing. The lines converge above c8, so `value` is only
 readable on the ratio charts.
 
-## Metrics
+## Families
 
-| `--metric` | what it is | interval |
+`--family best` is the deck chart: the three released baselines plus the best
+checkpoint from each of our two families, instead of four near-identical
+fine-tune lines. **"Best" is by point estimate only** — DSpark 32K vs 49K
+(239.7 vs 238.6 pooled tok/s at c1) and DFlash2 final vs mid (265.9 vs 259.7)
+each sit inside the other's bootstrap interval, so the pick is a presentation
+choice, not a measured ranking. `--family all` shows every checkpoint.
+
+## Metrics and `--value`
+
+| `--metric` | `per_turn` | `pooled` |
 |---|---|---|
-| `tps` | pooled `Σgen / Σ(steps × t_step)` | 95% paired bootstrap CI |
-| `accept_sw` | `1 + Σaccepted / Σsteps` | 95% paired bootstrap CI |
-| `vs_dflash` | pooled tok/s ÷ DFlash official's, same concurrency | 95% paired bootstrap CI |
-| `vs_nospec` | pooled tok/s ÷ the no-spec control's | **none — point estimate only** |
+| `accept` | mean over turns ± SEM | `1 + Σaccepted/Σsteps` ± bootstrap CI |
+| `tps` | mean of per-call rates ± SEM | `Σgen / Σ(steps × t_step)` ± bootstrap CI |
+| `vs_dflash` | mean over turns of that turn's rate ÷ DFlash's rate **on the same call** ± SEM | pooled ratio ± paired bootstrap CI |
+| `vs_nospec` | — | pooled ratio, **point estimate only** |
+
+`--value auto` (default) uses `per_turn` everywhere except `vs_nospec`, which
+has no per-turn variant.
+
+**The two weightings disagree in sign on `vs_dflash`, and both are real.** Our
+DSpark 32K is 1.02x DFlash official per turn and 0.95x pooled at c1. Per turn it
+wins the typical call; pooled it loses, because the fine-tune's acceptance gain
+sits on short turns that carry few tokens (per-turn acceptance 6.94 vs 6.44,
+step-weighted 4.81 vs 4.82). Quote whichever you mean and label it — do not mix
+them in one claim.
 
 The bootstrap is **paired**: every drafter replayed the byte-identical 280 calls
 (verified — the per-call keys intersect 280/280), so one resample of call indices
