@@ -32,18 +32,40 @@ disagree by a large margin:
                (4,000 resamples, seed 20260830), computed on the node from
                percall.json and hard-coded here.
 
-READ THIS BEFORE PLOTTING THROUGHPUT
-------------------------------------
-`--metric tokens --value per_request` computes a MEAN OF PER-CALL RATES. It is
-not a throughput anyone measures, and it runs ~33% high: per-call rate is just
-that call's acceptance divided by t_step, so it inherits the same short-call
-bias that makes per-request acceptance (6.44) exceed step-weighted acceptance
-(4.82). 6.44 / 19.047 ms = 338 tok/s against a real pooled 252 tok/s.
+WHICH AVERAGE TO USE FOR THROUGHPUT
+-----------------------------------
+Both aggregations are equally *measured* -- they read the same per-call
+counters. The choice is how calls are weighted, and for a rate it is not a
+free choice:
 
-The default for --metric tokens is therefore `pooled`, which is the column in
-the deck's Table B. The per-request variant is kept only so the two charts can
-be drawn on a matched definition if you want that, and it is labelled as such
-on the figure.
+  * `pooled` equals the TOKEN-WEIGHTED HARMONIC MEAN of the per-call rates,
+    exactly, in every row. So the pooled number already IS a per-turn average
+    of per-turn rates -- the harmonic one, which is the correct mean for a
+    rate. (One mile at 20 mph and one at 60 mph averages 30 mph, not 40.)
+
+  * `per_request` is the ARITHMETIC mean of per-call rates. Here
+    corr(completion_tokens, per-call rate) is -0.35 to -0.42 for every
+    DFlash/DSpark drafter: longer turns decode slower. The arithmetic mean
+    weights a 64-token turn the same as a 256-token turn that occupies four
+    times the wall-clock, so it over-weights the fast short turns. That is the
+    whole 334-vs-252 gap.
+
+  * The arithmetic mean is also the only summary under which our DSpark
+    fine-tune beats DFlash official on speed:
+        arithmetic mean   333.6 vs 341.7   ours +2.4%
+        median            324.9 vs 316.6   ours -2.6%
+        pooled/harmonic   251.9 vs 239.7   ours -4.8%
+    A speed claim that survives only under the arithmetic mean is the weakest
+    version of the claim.
+
+  * Finally, a per-call rate is just accept_len_i / t_step, and t_step moves
+    under 0.7% at concurrency 1. So the per-request throughput chart is the
+    per-request acceptance chart with a rescaled y-axis; it carries no
+    independent information.
+
+If you want a genuinely per-turn speed statistic, use the MEDIAN with an IQR,
+not the mean. Those are carried in DATA as tps_med / tps_p25 / tps_p75 (they
+are not plotted; print them with --list-dist).
 
 CAVEAT TO KEEP WITH ANY SLIDE BUILT FROM THIS
 ---------------------------------------------
@@ -78,42 +100,49 @@ DATA = {
         label="DFlash\n(official)", t_step_ms=19.047,
         accept_pr=6.4360, accept_pr_sem=0.1382,
         accept_sw=4.8242, accept_sw_ci=(4.5987, 5.1047),
+        tps_p25=228.5, tps_med=324.9, tps_p75=417.2,
         tps_pr=333.613, tps_pr_sem=7.018,
         tps_agg=251.862, tps_agg_ci=(240.277, 266.422)),
     "dflash2": dict(
         label="DFlash2", t_step_ms=19.386,
         accept_pr=6.3063, accept_pr_sem=0.1309,
         accept_sw=4.8390, accept_sw_ci=(4.6112, 5.1186),
+        tps_p25=235.0, tps_med=298.6, tps_p75=412.1,
         tps_pr=325.485, tps_pr_sem=6.762,
         tps_agg=249.648, tps_agg_ci=(237.831, 264.074)),
     "dspark-community": dict(
         label="DSpark\n(community)", t_step_ms=19.700,
         accept_pr=4.0220, accept_pr_sem=0.0745,
         accept_sw=3.6199, accept_sw_ci=(3.5129, 3.7392),
+        tps_p25=160.7, tps_med=189.0, tps_p75=232.5,
         tps_pr=204.475, tps_pr_sem=3.751,
         tps_agg=183.929, tps_agg_ci=(178.523, 189.974)),
     "dspark-run-a-32k": dict(
         label="Ours\nDSpark 32K", t_step_ms=19.724,
         accept_pr=6.9381, accept_pr_sem=0.1699,
         accept_sw=4.8065, accept_sw_ci=(4.5481, 5.1266),
+        tps_p25=227.8, tps_med=316.6, tps_p75=432.0,
         tps_pr=341.708, tps_pr_sem=8.273,
         tps_agg=239.731, tps_agg_ci=(227.287, 255.264)),
     "dspark-run-b-49k": dict(
         label="Ours\nDSpark 49K", t_step_ms=19.724,
         accept_pr=6.9190, accept_pr_sem=0.1699,
         accept_sw=4.7796, accept_sw_ci=(4.5149, 5.1027),
+        tps_p25=227.7, tps_med=314.1, tps_p75=428.7,
         tps_pr=341.074, tps_pr_sem=8.251,
         tps_agg=238.600, tps_agg_ci=(225.815, 254.195)),
     "dflash2-run-d-mid": dict(
         label="Ours\nDFlash2 mid", t_step_ms=19.370,
         accept_pr=7.2660, accept_pr_sem=0.1751,
         accept_sw=5.0664, accept_sw_ci=(4.7855, 5.4201),
+        tps_p25=247.9, tps_med=338.0, tps_p75=474.0,
         tps_pr=370.425, tps_pr_sem=8.892,
         tps_agg=259.707, tps_agg_ci=(245.498, 277.602)),
     "dflash2-run-d-final": dict(
         label="Ours\nDFlash2 final", t_step_ms=19.397,
         accept_pr=7.3500, accept_pr_sem=0.1759,
         accept_sw=5.1896, accept_sw_ci=(4.8894, 5.5729),
+        tps_p25=254.6, tps_med=345.9, tps_p75=476.9,
         tps_pr=374.567, tps_pr_sem=8.910,
         tps_agg=265.850, tps_agg_ci=(250.511, 285.300)),
 }
@@ -164,8 +193,8 @@ METRICS = {
     "tokens": dict(
         default_value="pooled",
         per_request=dict(field="tps_pr", sem="tps_pr_sem", ci=None,
-                         note="MEAN OF PER-CALL RATES (n={n}), error bars = SEM -- not a "
-                              "throughput anyone measures; see --help"),
+                         note="ARITHMETIC MEAN of per-call rates (n={n}), error bars = SEM "
+                              "-- runs high; see --help"),
         pooled=dict(field="tps_agg", sem=None, ci="tps_agg_ci",
                     note="pooled \u03a3gen / \u03a3(steps \u00d7 t_step); "
                          "error bars = 95% bootstrap CI over calls"),
@@ -300,7 +329,21 @@ def main(argv=None):
     p.add_argument("--dpi", type=int, default=200)
     p.add_argument("--ext", default="png", choices=["png", "pdf", "svg"])
     p.add_argument("--table-only", action="store_true")
+    p.add_argument("--list-dist", action="store_true",
+                   help="print the per-call throughput distribution (mean / p25 / "
+                        "median / p75) against the pooled value, then exit")
     a = p.parse_args(argv)
+
+    if a.list_dist:
+        print(f"{'drafter':22}{'mean':>8}{'p25':>8}{'median':>8}{'p75':>8}{'pooled':>8}")
+        print("per-call decode rate, tok/s, TB 64-256 bucket, concurrency 1, n=%d\n"
+              "pooled == the token-weighted harmonic mean of the same per-call rates."
+              % N_CALLS)
+        for k in FAMILIES["all"]:
+            d = DATA[k]
+            print(f"{k:22}{d['tps_pr']:8.1f}{d['tps_p25']:8.1f}"
+                  f"{d['tps_med']:8.1f}{d['tps_p75']:8.1f}{d['tps_agg']:8.1f}")
+        return 0
 
     ref = a.ref or DEFAULT_REF[a.family]
     if ref not in DATA:

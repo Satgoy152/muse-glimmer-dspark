@@ -47,13 +47,32 @@ Two aggregations are carried because they disagree:
 `--value auto` (the default) picks `per_request` for `--metric accept` and
 `pooled` for `--metric tokens`.
 
-**Do not plot throughput as `per_request`.** A mean of per-call rates is each
-call's acceptance divided by `t_step`, so it inherits the same short-call bias
-that makes per-request acceptance (6.44) exceed step-weighted acceptance (4.82):
-6.44 / 19.047 ms = 338 tok/s against a real pooled 252 tok/s, ~33% high. The
-`pooled` column is the one in the deck's Table B. The per-request variant is
-kept only so both charts can be drawn on a matched definition, and the figure
-labels itself when you do.
+### Why throughput is pooled, not averaged over turns
+
+Both are equally *measured* — same per-call counters, different weighting. For a
+rate the weighting is not a free choice:
+
+* `pooled` equals the **token-weighted harmonic mean** of the per-call rates,
+  exactly, in every row. So it already is a per-turn average of per-turn rates —
+  the harmonic one, which is the correct mean for a rate. (One mile at 20 mph
+  and one at 60 mph averages 30 mph, not 40.)
+* `per_request` is the **arithmetic** mean. Here `corr(completion_tokens,
+  per-call rate)` is −0.35 to −0.42 for every DFlash/DSpark drafter — longer
+  turns decode slower — so it weights a 64-token turn the same as a 256-token
+  turn occupying 4x the wall-clock. That is the whole 334-vs-252 gap.
+* It is also the only summary under which our DSpark fine-tune beats DFlash
+  official on speed: arithmetic mean 333.6 vs 341.7 (ours +2.4%), median 324.9
+  vs 316.6 (ours −2.6%), pooled 251.9 vs 239.7 (ours −4.8%).
+* A per-call rate is just `accept_len_i / t_step`, and `t_step` moves under 0.7%
+  at concurrency 1 — so the per-request throughput chart is the per-request
+  acceptance chart with a rescaled y-axis, carrying no independent information.
+
+For a genuinely per-turn speed statistic use the **median with an IQR**, not the
+mean. Those are in `DATA` as `tps_med` / `tps_p25` / `tps_p75`:
+
+```bash
+uv run python benchmark/plots/slide_bars.py --list-dist
+```
 
 **Caveat that must stay attached:** the `64-256` bucket is 60.35% of
 Terminal-Bench calls but only 24.19% of its decoded tokens. Per-request bars
