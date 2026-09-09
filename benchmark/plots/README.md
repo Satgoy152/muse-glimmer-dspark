@@ -3,6 +3,12 @@
 Self-contained. Every number is hard-coded in the script, so nothing here reads
 `results/`, the GPU node, or any other module — edit the `DATA` dict and re-run.
 
+Two scripts:
+
+* `slide_bars.py` — one concurrency (1), acceptance and throughput per drafter.
+* `slide_lines.py` — the same drafters across concurrency 1 / 2 / 8 / 32, plus a
+  speed-up-vs-DFlash chart.
+
 ## Commands
 
 ```bash
@@ -79,3 +85,48 @@ Terminal-Bench calls but only 24.19% of its decoded tokens. Per-request bars
 flatter the fine-tunes relative to what a deployment sees; the step-weighted
 numbers are much closer between drafters. Show both, or state which one is on
 the slide.
+
+
+# Line charts (`slide_lines.py`)
+
+```bash
+# all four line charts for the DSpark family: tps, accept_sw, vs_dflash, vs_nospec
+uv run --with matplotlib python benchmark/plots/slide_lines.py --family dspark
+
+# just the speed-up-over-DFlash chart
+uv run --with matplotlib python benchmark/plots/slide_lines.py \
+    --family dspark --metric vs_dflash
+
+# DFlash2 family
+uv run --with matplotlib python benchmark/plots/slide_lines.py --family dflash2
+
+# tables only, no matplotlib
+uv run python benchmark/plots/slide_lines.py --family all --table-only
+```
+
+`--annotate endpoints` (the default) labels only c1 and c32; `value` labels every
+point and `none` labels nothing. The lines converge above c8, so `value` is only
+readable on the ratio charts.
+
+## Metrics
+
+| `--metric` | what it is | interval |
+|---|---|---|
+| `tps` | pooled `Σgen / Σ(steps × t_step)` | 95% paired bootstrap CI |
+| `accept_sw` | `1 + Σaccepted / Σsteps` | 95% paired bootstrap CI |
+| `vs_dflash` | pooled tok/s ÷ DFlash official's, same concurrency | 95% paired bootstrap CI |
+| `vs_nospec` | pooled tok/s ÷ the no-spec control's | **none — point estimate only** |
+
+The bootstrap is **paired**: every drafter replayed the byte-identical 280 calls
+(verified — the per-call keys intersect 280/280), so one resample of call indices
+is applied to every drafter and to both halves of a ratio. That is why the
+`vs_dflash` intervals are far tighter than dividing two independent intervals
+would give.
+
+`vs_nospec` gets no interval: the no-speculation control ran as its own job with
+its own call keys and reports `steps == 0` per request, so it cannot be paired or
+resampled. Its throughput comes from the server counters and is a constant here.
+
+**`accept_sw` is expected to be four flat lines.** Acceptance is a property of
+the drafter and the prompt; the batch does not touch it. What moves with
+concurrency is `t_step`. That flatness is the result, not a broken plot.
